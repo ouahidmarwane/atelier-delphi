@@ -72,13 +72,13 @@ export const SCALES = {
     steps: ['Très rare', 'Rare', 'Occasionnelle', 'Fréquente', 'Très fréquente'],
   },
   i: {
-    label: 'Impact',
-    steps: ['Négligeable', 'Mineur', 'Modéré', 'Majeur', 'Critique'],
+    label: 'Gravité',
+    steps: ['Négligeable', 'Mineure', 'Modérée', 'Majeure', 'Critique'],
   },
 };
 
 export const RULES = {
-  // Consensus : au moins 70 % des réponses à ±1 de la médiane, en fréquence et en impact
+  // Consensus : au moins 70 % des réponses à ±1 de la médiane, en fréquence et en gravité
   consensusShare: 0.7,
   // Au tour 3, un écart de 2 points ou plus avec la médiane exige une justification
   justifyGap: 2,
@@ -88,16 +88,24 @@ export const RULES = {
   maxRisks: 8,
 };
 
-// Critères d'évaluation de MecaParts : on compare la criticité à ces seuils pour décider
+// Grille de notation du cours : la priorité dépend de la case fréquence × gravité
+export function priorityOf(f, g) {
+  const F = Math.round(f ?? 0);
+  const G = Math.round(g ?? 0);
+  if (G >= 4) return 'p1';
+  if (G === 3) return F >= 4 ? 'p1' : 'p2';
+  return F >= 3 ? 'p2' : 'p3';
+}
+
+// Critères d'évaluation : chaque priorité de la grille correspond à une décision
 export const EVAL_CRITERIA = [
-  { id: 'now', min: 15, range: '15 à 25', label: 'Traiter en priorité', text: 'Plan d’action immédiat avec un responsable nommé' },
-  { id: 'treat', min: 10, range: '10 à 14', label: 'À traiter', text: 'Mesures planifiées avant le démarrage de la ligne' },
-  { id: 'watch', min: 5, range: '5 à 9', label: 'À surveiller', text: 'Indicateur de suivi et revue chaque mois' },
-  { id: 'accept', min: 0, range: '1 à 4', label: 'Accepter', text: 'On garde les moyens de maîtrise existants' },
+  { id: 'p1', label: 'Priorité 1', action: 'Traiter en priorité', zone: 'Gravité 4 ou 5, ou gravité 3 avec fréquence 4 ou 5', text: 'Plan d’action immédiat avec un responsable nommé' },
+  { id: 'p2', label: 'Priorité 2', action: 'À traiter', zone: 'Gravité 3 avec fréquence 1 à 3, ou gravité 1 ou 2 avec fréquence 3 à 5', text: 'Mesures planifiées avant le démarrage et suivi régulier' },
+  { id: 'p3', label: 'Priorité 3', action: 'À surveiller', zone: 'Gravité 1 ou 2 avec fréquence 1 ou 2', text: 'On garde les moyens de maîtrise existants' },
 ];
 export const decisionById = Object.fromEntries(EVAL_CRITERIA.map((c) => [c.id, c]));
-export function autoDecision(crit) {
-  return EVAL_CRITERIA.find((c) => (crit ?? 0) >= c.min) || EVAL_CRITERIA[EVAL_CRITERIA.length - 1];
+export function autoDecision(x) {
+  return decisionById[priorityOf(x?.p?.median, x?.i?.median)];
 }
 
 export function levelOf(crit) {

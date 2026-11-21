@@ -1,5 +1,5 @@
 // Analyse des réponses en temps réel : thèmes, doublons, statistiques et constats.
-import { THEMES, themeById, deptById, RULES, levelOf, DEPARTMENTS } from './content.js';
+import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js';
 
 export function normalize(text) {
   return ' ' + String(text || '')
@@ -109,7 +109,7 @@ export function analyzeRatings(answers, risks) {
     const agreement = p.n ? Math.min(p.within, i.within) : 0;
     const justifications = rows.map((r) => r.payload?.why).filter(Boolean);
     const measures = rows.map((r) => r.payload?.measure).filter(Boolean);
-    return { ...risk, n: p.n, p, i, crit, level: crit != null ? levelOf(crit) : null, consensus, agreement, justifications, measures };
+    return { ...risk, n: p.n, p, i, crit, level: crit != null ? decisionById[priorityOf(p.median, i.median)] : null, consensus, agreement, justifications, measures };
   });
 }
 
@@ -143,8 +143,11 @@ export function insightsRatings(results, previous) {
   const out = [];
   const ok = results.filter((r) => r.consensus);
   out.push(`${ok.length} risque${ok.length > 1 ? 's' : ''} sur ${results.length} ${ok.length > 1 ? 'font' : 'fait'} consensus`);
-  const ranked = [...results].filter((r) => r.crit != null).sort((a, b) => b.crit - a.crit);
-  if (ranked[0]) out.push(`Le plus critique : ${lower(ranked[0].label)}, criticité ${fmt(ranked[0].crit)} sur 25`);
+  const pr = (r) => Number(String(r.level?.id || 'p9').slice(1));
+  const ranked = [...results].filter((r) => r.crit != null).sort((a, b) => pr(a) - pr(b) || b.crit - a.crit);
+  if (ranked[0]) out.push(`Le plus critique : ${lower(ranked[0].label)}, ${ranked[0].level?.label.toLowerCase()}, criticité ${fmt(ranked[0].crit)} sur 25`);
+  const p1 = results.filter((r) => r.level?.id === 'p1').length;
+  if (p1) out.push(`${p1} risque${p1 > 1 ? 's tombent' : ' tombe'} en priorité 1 dans la grille de notation`);
   const split = [...results].filter((r) => !r.consensus && r.n).sort((a, b) => a.agreement - b.agreement)[0];
   if (split) out.push(`Le plus grand désaccord : ${lower(split.label)}, seulement ${pct(split.agreement)} des avis proches de la médiane`);
   if (previous) {

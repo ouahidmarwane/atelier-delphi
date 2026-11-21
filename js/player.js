@@ -231,8 +231,8 @@ function ratingForm(q, draft) {
     </fieldset>`;
   return `
     ${fb ? `<div class="fb">
-      <p><span class="muted">Médiane du groupe, tour ${state.round - 1}</span><b class="num">F ${fmt(fb.p)} · I ${fmt(fb.i)}</b></p>
-      ${prev ? `<p><span class="muted">Votre note</span><b class="num">F ${prev.p} · I ${prev.i}</b></p>` : ''}
+      <p><span class="muted">Médiane du groupe, tour ${state.round - 1}</span><b class="num">F ${fmt(fb.p)} · G ${fmt(fb.i)}</b></p>
+      ${prev ? `<p><span class="muted">Votre note</span><b class="num">F ${prev.p} · G ${prev.i}</b></p>` : ''}
     </div>` : ''}
     ${scale('p')}${scale('i')}
     ${state.round >= 3 ? `
@@ -285,7 +285,7 @@ function bindForm(q, key, draft) {
       if (!text) return showError(status, 'Écrivez au moins une réponse');
       payload = { text };
     } else {
-      if (!draft.p || !draft.i) return showError(status, 'Choisissez une note en fréquence et en impact');
+      if (!draft.p || !draft.i) return showError(status, 'Choisissez une note en fréquence et en gravité');
       if (needsWhy(q, draft) && !String(draft.why || '').trim()) return showError(status, 'Ajoutez une justification');
       payload = { p: draft.p, i: draft.i };
       if (state.round >= 3) {

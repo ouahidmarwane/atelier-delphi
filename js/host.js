@@ -1,5 +1,5 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, BOT_LINES, BOT_NAMES, BOT_MEASURES, levelOf } from './content.js';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, BOT_LINES, BOT_NAMES, BOT_MEASURES } from './content.js';
 import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js';
 import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js';
 import { uid } from './store.js';
@@ -161,6 +161,10 @@ function round1Analysis() {
 
 const ratingResults = (round) => analyzeRatings(answersOf(round), risksOf(round));
 
+// Classement : d'abord la priorité de la grille, puis la criticité
+const prioRank = (x) => Number(String(x.level?.id || 'p9').slice(1));
+const byPriority = (a, b) => prioRank(a) - prioRank(b) || b.crit - a.crit || b.agreement - a.agreement;
+
 function finalResults() {
   const rounds = ratingRounds();
   return state.risks.map((risk) => {
@@ -169,7 +173,7 @@ function finalResults() {
     const res = analyzeRatings(answersOf(last), [risk])[0];
     const measures = rated.filter((r) => r >= 3).flatMap((r) => analyzeRatings(answersOf(r), [risk])[0].measures);
     return { ...res, lastRound: last, rounds: rated.length, top: topMeasures(measures, 2) };
-  }).filter((r) => r.n).sort((a, b) => b.crit - a.crit || b.agreement - a.agreement);
+  }).filter((r) => r.n).sort(byPriority);
 }
 
 // ---------- Rendu ----------
@@ -373,7 +377,7 @@ function questionStage() {
 function scalesLegend(fb) {
   const row = (k) => `<div class="legend-row"><span class="legend-name">${SCALES[k].label}</span>${SCALES[k].steps.map((s, i) => `<span class="legend-step"><b class="num">${i + 1}</b>${esc(s)}</span>`).join('')}</div>`;
   return `<div class="legend">${row('p')}${row('i')}</div>
-    ${fb ? `<p class="feedback">Médiane du groupe au tour précédent : fréquence <b class="num">${fmt(fb.p)}</b>, impact <b class="num">${fmt(fb.i)}</b></p>` : ''}`;
+    ${fb ? `<p class="feedback">Médiane du groupe au tour précédent : fréquence <b class="num">${fmt(fb.p)}</b>, gravité <b class="num">${fmt(fb.i)}</b></p>` : ''}`;
 }
 
 function liveAnalysis() {
@@ -561,7 +565,7 @@ function ratingResultsStage() {
   const r = state.round;
   const results = ratingResults(r);
   const prev = r >= 3 ? analyzeRatings(answersOf(r - 1), risksOf(r)) : null;
-  const ranked = [...results].filter((x) => x.n).sort((a, b) => b.crit - a.crit || b.agreement - a.agreement);
+  const ranked = [...results].filter((x) => x.n).sort(byPriority);
   const views = ratingViews();
   const view = views[Math.min(state.resultIndex, views.length - 1)];
   const titles = { matrix: 'Matrice des risques et classement', detail: 'Répartition des notes par risque', convergence: 'Convergence des avis' };
@@ -593,7 +597,7 @@ function ratingResultsStage() {
 }
 
 function cellLevel(p, i) {
-  return levelOf(p * i).id;
+  return priorityOf(p, i);
 }
 
 function matrixSvg(ranked) {
@@ -634,17 +638,17 @@ function matrixSvg(ranked) {
     });
   }
   const dots = pts.map((pt, idx) => `<g class="spot ${idx === 0 ? 'lead' : ''}" style="--i:${idx}" data-rank="${idx}" data-tip="${esc(`${idx + 1}. ${ranked[idx].label} · criticité ${fmt(ranked[idx].crit)}`)}">${idx === 0 ? `<circle class="ring" cx="${pt.x}" cy="${pt.y}" r="15"/>` : ''}<circle cx="${pt.x}" cy="${pt.y}" r="15"/><text x="${pt.x}" y="${pt.y + 5}">${idx + 1}</text></g>`).join('');
-  return `<svg viewBox="0 0 ${L + 5 * S + 20} ${T + 5 * S + 60}" class="matrix" role="img" aria-label="Matrice fréquence impact">
-    <text x="${L - 40}" y="${T - 10}" class="ax-title" text-anchor="start">Impact</text>
+  return `<svg viewBox="0 0 ${L + 5 * S + 20} ${T + 5 * S + 60}" class="matrix" role="img" aria-label="Grille de notation fréquence gravité">
+    <text x="${L - 40}" y="${T - 10}" class="ax-title" text-anchor="start">Gravité</text>
     ${cells}${axes}${dots}
     <text x="${L + 5 * S}" y="${T + 5 * S + 52}" class="ax-title" text-anchor="end">Fréquence</text>
   </svg>
-  <div class="levels">${['crit', 'high', 'mid', 'low'].map((id) => `<span><i class="sw ${id}"></i>${{ crit: 'Critique ≥ 15', high: 'Élevé 10 à 14', mid: 'Moyen 5 à 9', low: 'Faible < 5' }[id]}</span>`).join('')}</div>`;
+  <div class="levels">${EVAL_CRITERIA.map((c) => `<span><i class="sw ${c.id}"></i>${c.label}</span>`).join('')}</div>`;
 }
 
 function rankTable(ranked) {
   return `<table class="rank">
-    <thead><tr><th>#</th><th>Risque</th><th class="r">F</th><th class="r">I</th><th class="r">Criticité</th><th class="r">Accord</th></tr></thead>
+    <thead><tr><th>#</th><th>Risque</th><th class="r">F</th><th class="r">G</th><th class="r">Criticité</th><th class="r">Accord</th></tr></thead>
     <tbody>${ranked.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
       <td class="num muted">${i + 1}</td>
       <td>${esc(x.label)}</td>
@@ -654,7 +658,7 @@ function rankTable(ranked) {
       <td class="r num ${x.consensus ? 'ok' : 'warn'}">${pct(x.agreement)}</td>
     </tr>`).join('')}</tbody>
   </table>
-  <p class="muted small">Accord : part des avis à ±1 de la médiane. Consensus à partir de ${pct(RULES.consensusShare)} en fréquence et en impact.</p>`;
+  <p class="muted small">Accord : part des avis à ±1 de la médiane. Consensus à partir de ${pct(RULES.consensusShare)} en fréquence et en gravité.</p>`;
 }
 
 function histCard(x, rank) {
@@ -667,7 +671,7 @@ function histCard(x, rank) {
   };
   return `<article class="panel hcard" style="--i:${i}">
     <header><span class="num muted">${rank}</span><h4>${esc(x.label)}</h4><span class="tag ${x.consensus ? 'ok' : 'warn'}">${x.consensus ? 'Consensus' : 'Divergence'}</span></header>
-    <div class="hists">${hist(x.p, 'Fréquence')}${hist(x.i, 'Impact')}</div>
+    <div class="hists">${hist(x.p, 'Fréquence')}${hist(x.i, 'Gravité')}</div>
     <p class="muted small num">${x.n} avis · écart interquartile ${fmt(x.p.iqr)} et ${fmt(x.i.iqr)}</p>
   </article>`;
 }
@@ -707,7 +711,7 @@ function decisionPanel(results) {
 // Évaluation : comparer chaque niveau aux critères et décider
 function decisionOf(x) {
   const o = state.overrides?.[x.id];
-  return (o && decisionById[o]) || autoDecision(x.crit);
+  return (o && decisionById[o]) || autoDecision(x);
 }
 
 function evaluateStage() {
@@ -716,18 +720,18 @@ function evaluateStage() {
   const criteria = EVAL_CRITERIA.map((c, i) => `
     <li class="crit-row ${c.id}" style="--i:${i}">
       <span class="crit-band"></span>
-      <span class="crit-range num">${c.range}</span>
-      <span class="crit-text"><b>${c.label}</b><span class="muted">${c.text}</span></span>
+      <span class="crit-range">${c.label}</span>
+      <span class="crit-text"><b>${c.action}</b><span class="muted">${c.zone}</span><span class="muted">${c.text}</span></span>
       <span class="crit-count num">${counts[c.id]}</span>
     </li>`).join('');
   const rows = res.map((x, i) => {
     const d = decisionOf(x);
-    const auto = autoDecision(x.crit);
+    const auto = autoDecision(x);
     return `<li class="eval-row" style="--i:${i}">
       <span class="num muted">${i + 1}</span>
       <span class="eval-label">${esc(x.label)}${d.id !== auto.id ? '<span class="changed">modifié</span>' : ''}</span>
       <span class="lvl ${x.level?.id}">${fmt(x.crit)}</span>
-      <span class="decide">${EVAL_CRITERIA.map((c) => `<button class="${c.id} ${c.id === d.id ? 'on' : ''}" data-act="decide" data-id="${esc(x.id)}" data-d="${c.id}" aria-pressed="${c.id === d.id}">${c.label}</button>`).join('')}</span>
+      <span class="decide">${EVAL_CRITERIA.map((c) => `<button class="${c.id} ${c.id === d.id ? 'on' : ''}" data-act="decide" data-id="${esc(x.id)}" data-d="${c.id}" aria-pressed="${c.id === d.id}">${c.label} · ${c.action}</button>`).join('')}</span>
     </li>`;
   }).join('');
   return `
@@ -739,12 +743,12 @@ function evaluateStage() {
     </header>
     <div class="res-grid eval-grid">
       <div class="panel">
-        <h3>Critères de risque</h3>
+        <h3>Critères de risque <span class="muted">grille de notation du cours</span></h3>
         <ol class="criteria">${criteria}</ol>
-        <p class="muted small">Criticité = fréquence médiane × impact médian, sur 25</p>
+        <p class="muted small">La priorité vient de la case de la grille où tombe le risque : fréquence médiane et gravité médiane. La criticité affichée est fréquence × gravité, sur 25.</p>
       </div>
       <div class="panel">
-        <h3>Décision par risque <span class="muted">classés par criticité</span></h3>
+        <h3>Décision par risque <span class="muted">classés par priorité puis criticité</span></h3>
         <ol class="eval-list">${rows}</ol>
       </div>
     </div>
@@ -753,7 +757,7 @@ function evaluateStage() {
 
 // Résultat final
 function finalStage() {
-  const res = finalResults();
+  const res = finalResults().sort((a, b) => Number(decisionOf(a).id.slice(1)) - Number(decisionOf(b).id.slice(1)) || b.crit - a.crit);
   const ok = res.filter((x) => x.consensus).length;
   const rounds = Math.max(1, ...ratingRounds());
   return `
@@ -766,14 +770,14 @@ function finalStage() {
     <div class="res-grid wide-left">
       <div class="panel">
         <table class="rank final-table">
-          <thead><tr><th>#</th><th>Risque</th><th class="r">F</th><th class="r">I</th><th>Niveau</th><th>Décision</th><th>Mesures de maîtrise proposées</th></tr></thead>
+          <thead><tr><th>#</th><th>Risque</th><th class="r">F</th><th class="r">G</th><th class="r">Criticité</th><th>Décision</th><th>Mesures de maîtrise proposées</th></tr></thead>
           <tbody>${res.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
             <td class="num muted">${i + 1}</td>
             <td><span class="rname">${esc(x.label)}</span><span class="muted small">${x.consensus ? 'Consensus' : 'Sans consensus'} · tour ${x.lastRound}</span></td>
             <td class="r num">${fmt(x.p.median)}</td>
             <td class="r num">${fmt(x.i.median)}</td>
-            <td><span class="lvl ${x.level?.id}">${x.level?.label} <b class="num">${fmt(x.crit)}</b></span></td>
-            <td><span class="dec ${decisionOf(x).id}">${decisionOf(x).label}</span></td>
+            <td class="r"><span class="lvl ${x.level?.id}">${fmt(x.crit)}</span></td>
+            <td><span class="dec ${decisionOf(x).id}">${decisionOf(x).label} · ${decisionOf(x).action}</span></td>
             <td>${x.top.length ? `<ul class="measures">${x.top.map((m) => `<li>${esc(m.text)}${m.count > 1 ? ` <span class="muted num">×${m.count}</span>` : ''}</li>`).join('')}</ul>` : '<span class="muted">Aucune proposition</span>'}</td>
           </tr>`).join('')}</tbody>
         </table>
@@ -903,7 +907,7 @@ const actions = {
     const { id, d } = el.dataset;
     const risk = finalResults().find((x) => x.id === id);
     const overrides = { ...(state.overrides || {}) };
-    if (risk && autoDecision(risk.crit).id === d) delete overrides[id];
+    if (risk && autoDecision(risk).id === d) delete overrides[id];
     else overrides[id] = d;
     setState({ overrides });
   },
@@ -986,9 +990,9 @@ function tick() {
 }
 
 function exportCsv() {
-  const res = finalResults();
-  const head = ['Rang', 'Risque', 'Fréquence médiane', 'Impact médian', 'Criticité', 'Niveau', 'Décision', 'Accord', 'Consensus', 'Dernier tour', 'Mesures proposées'];
-  const rows = res.map((x, i) => [i + 1, x.label, fmt(x.p.median), fmt(x.i.median), fmt(x.crit), x.level?.label, decisionOf(x).label, pct(x.agreement), x.consensus ? 'Oui' : 'Non', x.lastRound, x.top.map((m) => m.text).join(' | ')]);
+  const res = finalResults().sort((a, b) => Number(decisionOf(a).id.slice(1)) - Number(decisionOf(b).id.slice(1)) || b.crit - a.crit);
+  const head = ['Rang', 'Risque', 'Fréquence médiane', 'Gravité médiane', 'Criticité', 'Priorité', 'Décision', 'Accord', 'Consensus', 'Dernier tour', 'Mesures proposées'];
+  const rows = res.map((x, i) => [i + 1, x.label, fmt(x.p.median), fmt(x.i.median), fmt(x.crit), decisionOf(x).label, decisionOf(x).action, pct(x.agreement), x.consensus ? 'Oui' : 'Non', x.lastRound, x.top.map((m) => m.text).join(' | ')]);
   const csv = [head, ...rows].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
