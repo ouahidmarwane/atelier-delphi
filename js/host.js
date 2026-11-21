@@ -42,8 +42,8 @@ function renderLanding(error) {
       <p class="eyebrow">Gestion des risques · cas pratique</p>
       <h1>La méthode Delphi appliquée au lancement d’une ligne chez ${esc(SCENARIO.company)}</h1>
       <p class="lead">Cet écran pilote la séance au projecteur. Les étudiants rejoignent avec le QR code et répondent depuis leur téléphone, tour après tour, jusqu’au consensus.</p>
-      <p class="mode-note ${store.mode}" data-mode>${store.mode === 'supabase'
-        ? 'Connexion à Supabase…'
+      <p class="mode-note ${store.mode}" data-mode ${store.mode === 'supabase' ? 'hidden' : ''}>${store.mode === 'supabase'
+        ? ''
         : 'Mode répétition : sans serveur, les téléphones ne peuvent pas rejoindre. Ouvrez le lien étudiant dans un autre onglet pour tester, ou configurez Supabase.'}</p>
       ${error ? `<p class="error">${esc(error)}</p>` : ''}
       <form class="settings" id="create">
@@ -62,8 +62,8 @@ function renderLanding(error) {
   if (store.mode === 'supabase') {
     const note = app.querySelector('[data-mode]');
     store.ping()
-      .then(() => { note.innerHTML = `${icon('check')} Connecté à Supabase, les téléphones peuvent rejoindre`; })
       .catch((err) => {
+        note.hidden = false;
         note.className = 'mode-note error-note';
         note.textContent = 'Supabase ne répond pas : ' + (err.message || err) + '. Vérifiez la connexion internet ou les clés dans js/config.js.';
       });
@@ -291,8 +291,7 @@ function lobbyStage() {
     <div class="join-card">
       ${qrSvg(url)}
       <div class="join-meta">
-        <span class="muted">Scannez pour rejoindre, ou ouvrez</span>
-        <span class="url">${esc(url.replace(/^https?:\/\//, ''))}</span>
+        <span class="muted">Scannez le QR code pour rejoindre</span>
         <span class="muted">Code de la session</span>
         <span class="bigcode num">${esc(code)}</span>
       </div>

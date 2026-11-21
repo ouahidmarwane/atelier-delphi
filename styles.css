@@ -180,6 +180,8 @@ kbd {
 .join-card { background: var(--card); border: 1px solid var(--line); border-radius: 1.1rem; padding: 1.5rem; display: grid; gap: 1.25rem; width: 25rem; }
 .qr { width: 100%; height: auto; display: block; border-radius: 0.4rem; }
 .join-meta { display: grid; gap: 0.2rem; font-size: 0.92rem; }
+.join-meta > .muted:first-child { margin-bottom: 0.7rem; }
+.mode-note[hidden] { display: none; }
 .join-meta .url { font-family: var(--mono); font-size: 0.95rem; word-break: break-all; margin-bottom: 0.7rem; }
 .bigcode { font-size: 2.6rem; font-weight: 500; letter-spacing: 0.08em; line-height: 1.1; }
 .count-block { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.75rem; }
