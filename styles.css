@@ -411,7 +411,7 @@ body.phone { min-height: 100vh; }
 .p-question textarea { margin-top: 0.75rem; min-height: 9rem; }
 .field input:focus, textarea:focus { outline: none; border-color: var(--text); }
 .depts { display: grid; gap: 0.45rem; margin-top: 0.45rem; }
-.dept-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.dept-opt input { position: absolute; opacity: 0; pointer-events: none; width: 1px !important; height: 1px !important; padding: 0 !important; left: 0; top: 0; }
 .dept-opt span {
   display: flex; align-items: center; gap: 0.65rem; height: 3rem; padding: 0 0.9rem; border-radius: 0.6rem;
   border: 1px solid var(--line-2); cursor: pointer; font-weight: 400;

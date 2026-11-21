@@ -3,6 +3,7 @@ import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES
 import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js';
 import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js';
 import { uid } from './store.js';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js';
 
 const app = document.getElementById('app');
 let store;
@@ -23,6 +24,9 @@ export async function startHost(s, sessionCode) {
   store = s;
   document.body.className = 'host';
   document.documentElement.className = 'is-host';
+  ambient();
+  ripples();
+  spotlight();
   bindGlobal();
   if (sessionCode) {
     const ok = await openSession(sessionCode);
@@ -202,19 +206,48 @@ function render() {
   app.innerHTML = `<div class="shell phase-${state.phase}">${topbar()}<main class="stage">${stage()}</main>${controls()}</div>`;
   updateConnection();
   tick();
+  afterRender();
+}
+
+let celebrated = '';
+function afterRender() {
+  countUps(app);
+  linkHover(app);
+  const key = `${state.phase}-${state.round}`;
+  if (celebrated === key) return;
+  if (state.phase === 'final') {
+    celebrated = key;
+    setTimeout(() => confetti(180), 350);
+  } else if (state.phase === 'results' && app.querySelector('.decision.ok')) {
+    celebrated = key;
+    setTimeout(() => confetti(110), 900);
+  }
 }
 
 function renderLive() {
   if (!state) return;
   const count = app.querySelector('[data-count]');
-  if (count) count.textContent = participants.size;
+  if (count && count.textContent !== String(participants.size)) {
+    count.textContent = participants.size;
+    bump(count);
+  }
   if (state.phase === 'question') {
     const live = app.querySelector('[data-live]');
-    if (live) { live.innerHTML = liveAnalysis(); return; }
+    if (live) {
+      const before = live.querySelector('.received b')?.textContent;
+      live.innerHTML = liveAnalysis();
+      if (before !== live.querySelector('.received b')?.textContent) bump(live.querySelector('.received b'));
+      return;
+    }
   }
   if (state.phase === 'lobby') {
     const lobby = app.querySelector('[data-lobby]');
-    if (lobby) { lobby.innerHTML = lobbyPeople(); return; }
+    if (lobby) {
+      const seen = new Set([...lobby.querySelectorAll('[data-pid]')].map((x) => x.dataset.pid));
+      lobby.innerHTML = lobbyPeople(seen);
+      if (seen.size !== participants.size) bump(lobby.querySelector('.count'));
+      return;
+    }
   }
   if (state.phase === 'scenario' || state.phase === 'interlude' || state.phase === 'final' || state.phase === 'consolidate') return;
   render();
@@ -243,7 +276,7 @@ function stage() {
 
 // Scénario
 function scenarioStage() {
-  const facts = SCENARIO.facts.map((f) => `<li><span class="fig num">${esc(f.figure)}</span><span class="fact"><b>${esc(f.unit)}</b> ${esc(f.text)}</span></li>`).join('');
+  const facts = SCENARIO.facts.map((f) => `<li><span class="fig num" data-countup>${esc(f.figure)}</span><span class="fact"><b>${esc(f.unit)}</b> ${esc(f.text)}</span></li>`).join('');
   return `
   <section class="scenario enter">
     <div class="sc-text">
@@ -289,7 +322,7 @@ function lobbyStage() {
   return `
   <section class="lobby enter">
     <div class="join-card">
-      ${qrSvg(url)}
+      <div class="qr-wrap">${qrSvg(url)}</div>
       <div class="join-meta">
         <span class="muted">Scannez le QR code pour rejoindre</span>
         <span class="muted">Code de la session</span>
@@ -300,14 +333,14 @@ function lobbyStage() {
   </section>`;
 }
 
-function lobbyPeople() {
+function lobbyPeople(seen = null) {
   const list = [...participants.values()];
   const cols = DEPARTMENTS.map((d) => {
     const ps = list.filter((p) => p.dept === d.id);
     const shown = ps.slice(-8);
-    return `<div class="dept-col">
+    return `<div class="dept-col" style="--c:${d.color}">
       <div class="dept-head"><i class="dot" style="--c:${d.color}"></i><span>${esc(d.name)}</span><b class="num">${ps.length}</b></div>
-      <ul>${shown.map((p) => `<li class="chip pop">${esc(p.name)}</li>`).join('')}${ps.length > shown.length ? `<li class="more">+${ps.length - shown.length}</li>` : ''}</ul>
+      <ul>${shown.map((p) => `<li class="chip ${!seen || !seen.has(p.id) ? 'pop' : ''}" data-pid="${p.id}">${esc(p.name)}</li>`).join('')}${ps.length > shown.length ? `<li class="more">+${ps.length - shown.length}</li>` : ''}</ul>
     </div>`;
   }).join('');
   return `
@@ -395,7 +428,7 @@ function results1Stage() {
   const max = Math.max(1, ...a.themes.map((t) => t.count));
   const shown = a.themes.slice(0, 9);
   const bars = shown.map((t, i) => `
-    <li class="tbar ${i === 0 ? 'lead' : ''}">
+    <li class="tbar ${i === 0 ? 'lead' : ''}" style="--i:${i}">
       <span class="tlabel">${esc(t.label)}</span>
       <span class="ttrack"><span class="tfill" style="width:${(100 * t.count) / max}%"></span></span>
       <span class="tcount num">${t.count}</span>
@@ -418,7 +451,7 @@ function results1Stage() {
       <div class="side-stack">
         <div class="panel">
           <h3>Réponses les plus répétées</h3>
-          ${repeated.length ? `<ul class="quotes">${repeated.map((r) => `<li><span class="qtext">${esc(r.text)}</span><span class="qmeta">${r.count > 1 ? `<b class="num">×${r.count}</b>` : ''}${deptDots(r.depts)}</span></li>`).join('')}</ul>` : '<p class="empty">Rien à afficher</p>'}
+          ${repeated.length ? `<ul class="quotes">${repeated.map((r, i) => `<li style="--i:${i}"><span class="qtext">${esc(r.text)}</span><span class="qmeta">${r.count > 1 ? `<b class="num">×${r.count}</b>` : ''}${deptDots(r.depts)}</span></li>`).join('')}</ul>` : '<p class="empty">Rien à afficher</p>'}
           <p class="anon muted small">Réponses anonymes, seul le département est indiqué</p>
         </div>
         ${insightsPanel(insights)}
@@ -448,7 +481,7 @@ function repeatedAnswers(rows) {
 
 function insightsPanel(list) {
   if (!list.length) return '';
-  return `<div class="panel insights"><h3>Analyse automatique</h3><ul>${list.map((s) => `<li>${esc(s)}</li>`).join('')}</ul></div>`;
+  return `<div class="panel insights"><h3>Analyse automatique</h3><ul>${list.map((s, i) => `<li style="--i:${i}">${esc(s)}</li>`).join('')}</ul></div>`;
 }
 
 function legendDepts() {
@@ -474,7 +507,7 @@ function consolidateStage() {
   const all = [...c.list.map((t) => ({ id: t.id, label: t.label, depts: t.depts, count: t.count })), ...c.custom.map((r) => ({ ...r, depts: [], count: null }))];
   const rows = all.map((t, i) => `
     <li>
-      <button class="pick ${c.selected.has(t.id) ? 'on' : ''}" data-act="toggle" data-id="${esc(t.id)}" aria-pressed="${c.selected.has(t.id)}">
+      <button class="pick ${c.selected.has(t.id) ? 'on' : ''}" style="--i:${i}" data-act="toggle" data-id="${esc(t.id)}" aria-pressed="${c.selected.has(t.id)}">
         <span class="box">${icon('check')}</span>
         <span class="pnum num">${String(i + 1).padStart(2, '0')}</span>
         <span class="plabel">${esc(t.label)}</span>
@@ -598,7 +631,7 @@ function matrixSvg(ranked) {
       pt.y = Math.max(T + 16, Math.min(T + 5 * S - 16, pt.y));
     });
   }
-  const dots = pts.map((pt, idx) => `<g class="spot ${idx === 0 ? 'lead' : ''}"><circle cx="${pt.x}" cy="${pt.y}" r="15"/><text x="${pt.x}" y="${pt.y + 5}">${idx + 1}</text></g>`).join('');
+  const dots = pts.map((pt, idx) => `<g class="spot ${idx === 0 ? 'lead' : ''}" style="--i:${idx}" data-rank="${idx}" data-tip="${esc(`${idx + 1}. ${ranked[idx].label} · criticité ${fmt(ranked[idx].crit)}`)}">${idx === 0 ? `<circle class="ring" cx="${pt.x}" cy="${pt.y}" r="15"/>` : ''}<circle cx="${pt.x}" cy="${pt.y}" r="15"/><text x="${pt.x}" y="${pt.y + 5}">${idx + 1}</text></g>`).join('');
   return `<svg viewBox="0 0 ${L + 5 * S + 20} ${T + 5 * S + 60}" class="matrix" role="img" aria-label="Matrice probabilité impact">
     <text x="${L - 40}" y="${T - 10}" class="ax-title" text-anchor="start">Impact</text>
     ${cells}${axes}${dots}
@@ -610,7 +643,7 @@ function matrixSvg(ranked) {
 function rankTable(ranked) {
   return `<table class="rank">
     <thead><tr><th>#</th><th>Risque</th><th class="r">P</th><th class="r">I</th><th class="r">Criticité</th><th class="r">Accord</th></tr></thead>
-    <tbody>${ranked.map((x, i) => `<tr>
+    <tbody>${ranked.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
       <td class="num muted">${i + 1}</td>
       <td>${esc(x.label)}</td>
       <td class="r num">${fmt(x.p.median)}</td>
@@ -623,13 +656,14 @@ function rankTable(ranked) {
 }
 
 function histCard(x, rank) {
+  const i = rank - 1;
   const hist = (s, label) => {
     const max = Math.max(1, ...s.dist);
     const med = Math.round(s.median ?? 0);
     return `<div class="hist"><span class="hist-label">${label} <b class="num">${fmt(s.median)}</b></span>
       <div class="hbars">${s.dist.map((v, k) => `<span class="hb ${k + 1 === med ? 'med' : ''}"><i style="height:${(100 * v) / max}%"></i><em class="num">${k + 1}</em></span>`).join('')}</div></div>`;
   };
-  return `<article class="panel hcard">
+  return `<article class="panel hcard" style="--i:${i}">
     <header><span class="num muted">${rank}</span><h4>${esc(x.label)}</h4><span class="tag ${x.consensus ? 'ok' : 'warn'}">${x.consensus ? 'Consensus' : 'Divergence'}</span></header>
     <div class="hists">${hist(x.p, 'Probabilité')}${hist(x.i, 'Impact')}</div>
     <p class="muted small num">${x.n} avis · écart interquartile ${fmt(x.p.iqr)} et ${fmt(x.i.iqr)}</p>
@@ -637,19 +671,19 @@ function histCard(x, rank) {
 }
 
 function convergence(results, prev) {
-  const rows = results.map((x) => {
+  const rows = results.map((x, i) => {
     const p = prev?.find((y) => y.id === x.id);
     const a = p?.n ? p.agreement : null;
     const b = x.agreement;
     const lo = a == null ? b : Math.min(a, b);
     const hi = a == null ? b : Math.max(a, b);
-    return `<li class="conv-row">
+    return `<li class="conv-row" style="--i:${i}">
       <span class="conv-label">${esc(x.label)}</span>
       <span class="conv-track">
         <span class="threshold" style="left:${RULES.consensusShare * 100}%"></span>
         <span class="conv-seg" style="left:${lo * 100}%;width:${(hi - lo) * 100}%"></span>
         ${a != null ? `<span class="pt before" style="left:${a * 100}%"></span>` : ''}
-        <span class="pt after ${x.consensus ? 'ok' : ''}" style="left:${b * 100}%"></span>
+        <span class="pt after ${x.consensus ? 'ok' : ''}" style="left:${b * 100}%;--from:${(a ?? b) * 100}%;--to:${b * 100}%"></span>
       </span>
       <span class="conv-val num">${a != null ? `${pct(a)} → ` : ''}<b>${pct(b)}</b></span>
       <span class="tag ${x.consensus ? 'ok' : 'warn'}">${x.consensus ? 'Consensus' : 'À revoir'}</span>
@@ -684,7 +718,7 @@ function finalStage() {
       <div class="panel">
         <table class="rank final-table">
           <thead><tr><th>#</th><th>Risque</th><th class="r">P</th><th class="r">I</th><th>Niveau</th><th>Mesures de maîtrise proposées</th></tr></thead>
-          <tbody>${res.map((x, i) => `<tr>
+          <tbody>${res.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
             <td class="num muted">${i + 1}</td>
             <td><span class="rname">${esc(x.label)}</span><span class="muted small">${x.consensus ? 'Consensus' : 'Sans consensus'} · tour ${x.lastRound}</span></td>
             <td class="r num">${fmt(x.p.median)}</td>
@@ -867,7 +901,17 @@ function tick() {
   const left = t.pausedLeft != null ? t.pausedLeft : (t.endsAt - Date.now()) / 1000;
   const d = app.querySelector('.dial');
   updateDial(d, left, t.duration, t.pausedLeft != null);
-  if (state.phase === 'interlude' && d) d.querySelector('[data-time]').textContent = Math.max(0, Math.ceil(left));
+  if (state.phase === 'interlude' && d) {
+    const el = d.querySelector('[data-time]');
+    const v = String(Math.max(0, Math.ceil(left)));
+    if (el.dataset.v !== v) {
+      el.dataset.v = v;
+      el.classList.remove('tickpop');
+      void el.offsetWidth;
+      el.classList.add('tickpop');
+    }
+    el.textContent = v;
+  }
   if (state.phase === 'interlude' && d) d.querySelector('[data-label]').textContent = 'secondes';
   const token = `${state.phase}-${state.round}-${state.qIndex}`;
   if (left <= 0 && t.pausedLeft == null && firedFor !== token) {

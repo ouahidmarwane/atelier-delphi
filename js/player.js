@@ -3,6 +3,7 @@ import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES } from
 import { fmt } from './analysis.js';
 import { icon, esc, mmss } from './ui.js';
 import { uid } from './store.js';
+import { ambient, ripples, spotlight, vibrate } from './fx.js';
 
 const app = document.getElementById('app');
 let store;
@@ -21,6 +22,9 @@ export async function startPlayer(s, sessionCode) {
   store = s;
   document.body.className = 'phone';
   document.documentElement.className = 'is-phone';
+  ambient();
+  ripples();
+  spotlight();
   if (!sessionCode) return renderCodeForm();
   await open(sessionCode.toUpperCase());
 }
@@ -119,7 +123,7 @@ function renderJoin(error) {
       <label class="field"><span>Votre prénom</span><input name="name" maxlength="24" autocomplete="given-name" required></label>
       <fieldset class="field"><legend>Votre département</legend>
         <div class="depts">${DEPARTMENTS.map((d) => `
-          <label class="dept-opt"><input type="radio" name="dept" value="${d.id}" required><span><i class="dot" style="--c:${d.color}"></i>${esc(d.name)}</span></label>`).join('')}
+          <label class="dept-opt" style="--c:${d.color}"><input type="radio" name="dept" value="${d.id}" required><span><i class="dot" style="--c:${d.color}"></i>${esc(d.name)}</span></label>`).join('')}
         </div>
       </fieldset>
       ${error ? `<p class="error">${esc(error)}</p>` : ''}
@@ -296,7 +300,13 @@ function bindForm(q, key, draft) {
       mine.set(key, payload);
       status.className = 'status ok';
       status.innerHTML = `${icon('check')} Réponse envoyée, vous pouvez encore la modifier`;
-      btn.innerHTML = `Mettre à jour ${icon('send')}`;
+      btn.innerHTML = `${icon('check')} Envoyé`;
+      btn.classList.add('sent');
+      vibrate(40);
+      setTimeout(() => {
+        btn.classList.remove('sent');
+        btn.innerHTML = `Mettre à jour ${icon('send')}`;
+      }, 1400);
     } catch (err) {
       showError(status, 'Envoi impossible, réessayez');
     } finally {
@@ -318,6 +328,9 @@ function tick() {
   if (t) t.textContent = state.timer.pausedLeft != null ? 'Pause' : mmss(left);
   const bar = app.querySelector('[data-bar]');
   if (bar) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / state.timer.duration))})`;
+  const low = left <= 10 && left > 0 && state.timer.pausedLeft == null;
+  bar?.parentElement.classList.toggle('low', low);
+  t?.classList.toggle('low', low);
   const btn = app.querySelector('[data-send]');
   if (btn && left <= 0 && state.timer.pausedLeft == null) {
     btn.disabled = true;
