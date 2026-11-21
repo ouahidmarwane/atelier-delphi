@@ -164,6 +164,7 @@ function renderWaiting() {
     interlude: ['Fin du tour', 'Les réponses sont en cours d’analyse. Regardez le tableau.'],
     results: ['Résultats au tableau', 'Le tour suivant arrivera ici. Gardez cette page ouverte.'],
     consolidate: ['Consolidation en cours', 'L’animateur fusionne les doublons pour préparer le tour de notation.'],
+    evaluate: ['Évaluation en cours', 'L’animateur compare le niveau de chaque risque aux critères de l’entreprise pour décider quoi en faire.'],
     final: ['Consultation terminée', 'La liste hiérarchisée des risques est affichée au tableau. Merci pour votre participation.'],
   };
   const [title, text] = messages[p] || ['En attente', 'Gardez cette page ouverte.'];
@@ -230,8 +231,8 @@ function ratingForm(q, draft) {
     </fieldset>`;
   return `
     ${fb ? `<div class="fb">
-      <p><span class="muted">Médiane du groupe, tour ${state.round - 1}</span><b class="num">P ${fmt(fb.p)} · I ${fmt(fb.i)}</b></p>
-      ${prev ? `<p><span class="muted">Votre note</span><b class="num">P ${prev.p} · I ${prev.i}</b></p>` : ''}
+      <p><span class="muted">Médiane du groupe, tour ${state.round - 1}</span><b class="num">F ${fmt(fb.p)} · I ${fmt(fb.i)}</b></p>
+      ${prev ? `<p><span class="muted">Votre note</span><b class="num">F ${prev.p} · I ${prev.i}</b></p>` : ''}
     </div>` : ''}
     ${scale('p')}${scale('i')}
     ${state.round >= 3 ? `
@@ -284,7 +285,7 @@ function bindForm(q, key, draft) {
       if (!text) return showError(status, 'Écrivez au moins une réponse');
       payload = { text };
     } else {
-      if (!draft.p || !draft.i) return showError(status, 'Choisissez une note en probabilité et en impact');
+      if (!draft.p || !draft.i) return showError(status, 'Choisissez une note en fréquence et en impact');
       if (needsWhy(q, draft) && !String(draft.why || '').trim()) return showError(status, 'Ajoutez une justification');
       payload = { p: draft.p, i: draft.i };
       if (state.round >= 3) {

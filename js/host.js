@@ -1,5 +1,5 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, BOT_LINES, BOT_NAMES, BOT_MEASURES, levelOf } from './content.js';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, BOT_LINES, BOT_NAMES, BOT_MEASURES, levelOf } from './content.js';
 import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js';
 import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js';
 import { uid } from './store.js';
@@ -177,7 +177,8 @@ function finalResults() {
 function stepIndex() {
   const { phase, round } = state;
   if (phase === 'scenario' || phase === 'lobby') return 0;
-  if (phase === 'final') return 7;
+  if (phase === 'final') return 8;
+  if (phase === 'evaluate') return 7;
   if (phase === 'consolidate') return 2;
   const inRound = phase === 'question';
   if (round === 1) return inRound ? 1 : 2;
@@ -249,7 +250,7 @@ function renderLive() {
       return;
     }
   }
-  if (state.phase === 'scenario' || state.phase === 'interlude' || state.phase === 'final' || state.phase === 'consolidate') return;
+  if (['scenario', 'interlude', 'final', 'consolidate', 'evaluate'].includes(state.phase)) return;
   render();
 }
 
@@ -269,6 +270,7 @@ function stage() {
     case 'interlude': return interludeStage();
     case 'results': return state.round === 1 ? results1Stage() : ratingResultsStage();
     case 'consolidate': return consolidateStage();
+    case 'evaluate': return evaluateStage();
     case 'final': return finalStage();
     default: return '';
   }
@@ -371,7 +373,7 @@ function questionStage() {
 function scalesLegend(fb) {
   const row = (k) => `<div class="legend-row"><span class="legend-name">${SCALES[k].label}</span>${SCALES[k].steps.map((s, i) => `<span class="legend-step"><b class="num">${i + 1}</b>${esc(s)}</span>`).join('')}</div>`;
   return `<div class="legend">${row('p')}${row('i')}</div>
-    ${fb ? `<p class="feedback">Médiane du groupe au tour précédent : probabilité <b class="num">${fmt(fb.p)}</b>, impact <b class="num">${fmt(fb.i)}</b></p>` : ''}`;
+    ${fb ? `<p class="feedback">Médiane du groupe au tour précédent : fréquence <b class="num">${fmt(fb.p)}</b>, impact <b class="num">${fmt(fb.i)}</b></p>` : ''}`;
 }
 
 function liveAnalysis() {
@@ -632,17 +634,17 @@ function matrixSvg(ranked) {
     });
   }
   const dots = pts.map((pt, idx) => `<g class="spot ${idx === 0 ? 'lead' : ''}" style="--i:${idx}" data-rank="${idx}" data-tip="${esc(`${idx + 1}. ${ranked[idx].label} · criticité ${fmt(ranked[idx].crit)}`)}">${idx === 0 ? `<circle class="ring" cx="${pt.x}" cy="${pt.y}" r="15"/>` : ''}<circle cx="${pt.x}" cy="${pt.y}" r="15"/><text x="${pt.x}" y="${pt.y + 5}">${idx + 1}</text></g>`).join('');
-  return `<svg viewBox="0 0 ${L + 5 * S + 20} ${T + 5 * S + 60}" class="matrix" role="img" aria-label="Matrice probabilité impact">
+  return `<svg viewBox="0 0 ${L + 5 * S + 20} ${T + 5 * S + 60}" class="matrix" role="img" aria-label="Matrice fréquence impact">
     <text x="${L - 40}" y="${T - 10}" class="ax-title" text-anchor="start">Impact</text>
     ${cells}${axes}${dots}
-    <text x="${L + 5 * S}" y="${T + 5 * S + 52}" class="ax-title" text-anchor="end">Probabilité</text>
+    <text x="${L + 5 * S}" y="${T + 5 * S + 52}" class="ax-title" text-anchor="end">Fréquence</text>
   </svg>
   <div class="levels">${['crit', 'high', 'mid', 'low'].map((id) => `<span><i class="sw ${id}"></i>${{ crit: 'Critique ≥ 15', high: 'Élevé 10 à 14', mid: 'Moyen 5 à 9', low: 'Faible < 5' }[id]}</span>`).join('')}</div>`;
 }
 
 function rankTable(ranked) {
   return `<table class="rank">
-    <thead><tr><th>#</th><th>Risque</th><th class="r">P</th><th class="r">I</th><th class="r">Criticité</th><th class="r">Accord</th></tr></thead>
+    <thead><tr><th>#</th><th>Risque</th><th class="r">F</th><th class="r">I</th><th class="r">Criticité</th><th class="r">Accord</th></tr></thead>
     <tbody>${ranked.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
       <td class="num muted">${i + 1}</td>
       <td>${esc(x.label)}</td>
@@ -652,7 +654,7 @@ function rankTable(ranked) {
       <td class="r num ${x.consensus ? 'ok' : 'warn'}">${pct(x.agreement)}</td>
     </tr>`).join('')}</tbody>
   </table>
-  <p class="muted small">Accord : part des avis à ±1 de la médiane. Consensus à partir de ${pct(RULES.consensusShare)} en probabilité et en impact.</p>`;
+  <p class="muted small">Accord : part des avis à ±1 de la médiane. Consensus à partir de ${pct(RULES.consensusShare)} en fréquence et en impact.</p>`;
 }
 
 function histCard(x, rank) {
@@ -665,7 +667,7 @@ function histCard(x, rank) {
   };
   return `<article class="panel hcard" style="--i:${i}">
     <header><span class="num muted">${rank}</span><h4>${esc(x.label)}</h4><span class="tag ${x.consensus ? 'ok' : 'warn'}">${x.consensus ? 'Consensus' : 'Divergence'}</span></header>
-    <div class="hists">${hist(x.p, 'Probabilité')}${hist(x.i, 'Impact')}</div>
+    <div class="hists">${hist(x.p, 'Fréquence')}${hist(x.i, 'Impact')}</div>
     <p class="muted small num">${x.n} avis · écart interquartile ${fmt(x.p.iqr)} et ${fmt(x.i.iqr)}</p>
   </article>`;
 }
@@ -702,6 +704,53 @@ function decisionPanel(results) {
   return `<div class="panel decision"><h3>Pas encore de consensus</h3><p>${open.length} risque${open.length > 1 ? 's restent' : ' reste'} en dessous du seuil. Selon la méthode, on relance un tour sur ${open.length > 1 ? 'ces risques' : 'ce risque'}, ou on s’arrête si les réponses se sont stabilisées.</p></div>`;
 }
 
+// Évaluation : comparer chaque niveau aux critères et décider
+function decisionOf(x) {
+  const o = state.overrides?.[x.id];
+  return (o && decisionById[o]) || autoDecision(x.crit);
+}
+
+function evaluateStage() {
+  const res = finalResults();
+  const counts = Object.fromEntries(EVAL_CRITERIA.map((c) => [c.id, res.filter((x) => decisionOf(x).id === c.id).length]));
+  const criteria = EVAL_CRITERIA.map((c, i) => `
+    <li class="crit-row ${c.id}" style="--i:${i}">
+      <span class="crit-band"></span>
+      <span class="crit-range num">${c.range}</span>
+      <span class="crit-text"><b>${c.label}</b><span class="muted">${c.text}</span></span>
+      <span class="crit-count num">${counts[c.id]}</span>
+    </li>`).join('');
+  const rows = res.map((x, i) => {
+    const d = decisionOf(x);
+    const auto = autoDecision(x.crit);
+    return `<li class="eval-row" style="--i:${i}">
+      <span class="num muted">${i + 1}</span>
+      <span class="eval-label">${esc(x.label)}${d.id !== auto.id ? '<span class="changed">modifié</span>' : ''}</span>
+      <span class="lvl ${x.level?.id}">${fmt(x.crit)}</span>
+      <span class="decide">${EVAL_CRITERIA.map((c) => `<button class="${c.id} ${c.id === d.id ? 'on' : ''}" data-act="decide" data-id="${esc(x.id)}" data-d="${c.id}" aria-pressed="${c.id === d.id}">${c.label}</button>`).join('')}</span>
+    </li>`;
+  }).join('');
+  return `
+  <section class="evaluate enter">
+    <header class="res-head">
+      <p class="eyebrow">Évaluation du risque · ISO 31000</p>
+      <h2>Comparer chaque niveau aux critères de ${esc(SCENARIO.company)}</h2>
+      <p class="muted">Le niveau vient de l’analyse des experts. La décision appartient à l’organisation : cliquez pour la modifier.</p>
+    </header>
+    <div class="res-grid eval-grid">
+      <div class="panel">
+        <h3>Critères de risque</h3>
+        <ol class="criteria">${criteria}</ol>
+        <p class="muted small">Criticité = fréquence médiane × impact médian, sur 25</p>
+      </div>
+      <div class="panel">
+        <h3>Décision par risque <span class="muted">classés par criticité</span></h3>
+        <ol class="eval-list">${rows}</ol>
+      </div>
+    </div>
+  </section>`;
+}
+
 // Résultat final
 function finalStage() {
   const res = finalResults();
@@ -717,13 +766,14 @@ function finalStage() {
     <div class="res-grid wide-left">
       <div class="panel">
         <table class="rank final-table">
-          <thead><tr><th>#</th><th>Risque</th><th class="r">P</th><th class="r">I</th><th>Niveau</th><th>Mesures de maîtrise proposées</th></tr></thead>
+          <thead><tr><th>#</th><th>Risque</th><th class="r">F</th><th class="r">I</th><th>Niveau</th><th>Décision</th><th>Mesures de maîtrise proposées</th></tr></thead>
           <tbody>${res.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
             <td class="num muted">${i + 1}</td>
             <td><span class="rname">${esc(x.label)}</span><span class="muted small">${x.consensus ? 'Consensus' : 'Sans consensus'} · tour ${x.lastRound}</span></td>
             <td class="r num">${fmt(x.p.median)}</td>
             <td class="r num">${fmt(x.i.median)}</td>
             <td><span class="lvl ${x.level?.id}">${x.level?.label} <b class="num">${fmt(x.crit)}</b></span></td>
+            <td><span class="dec ${decisionOf(x).id}">${decisionOf(x).label}</span></td>
             <td>${x.top.length ? `<ul class="measures">${x.top.map((m) => `<li>${esc(m.text)}${m.count > 1 ? ` <span class="muted num">×${m.count}</span>` : ''}</li>`).join('')}</ul>` : '<span class="muted">Aucune proposition</span>'}</td>
           </tr>`).join('')}</tbody>
         </table>
@@ -763,12 +813,12 @@ function controls() {
       const count = state.round === 1 ? ROUND1_QUESTIONS.length : ratingViews().length;
       const nav = `<div class="pager">${b('prevView', '', 'icon', 'chevron-left')}<span class="num">${Math.min(state.resultIndex, count - 1) + 1} / ${count}</span>${b('nextView', '', 'icon', 'chevron-right')}</div>`;
       if (state.round === 1) right = nav + b('toConsolidate', 'Consolider la liste', 'primary', 'arrow-right');
-      else if (state.round === 2) right = nav + b('toFinal', 'Clore la consultation', 'ghost') + b('nextRound', 'Lancer le tour 3', 'primary', 'arrow-right');
+      else if (state.round === 2) right = nav + b('toEvaluate', 'Clore et évaluer', 'ghost') + b('nextRound', 'Lancer le tour 3', 'primary', 'arrow-right');
       else {
         const open = ratingResults(state.round).filter((x) => x.n && !x.consensus).length;
         right = nav + (open
-          ? b('toFinal', 'Clore la consultation', 'ghost') + b('nextRound', `Tour ${state.round + 1} sur ${open} risque${open > 1 ? 's' : ''}`, 'primary', 'arrow-right')
-          : b('toFinal', 'Voir le résultat final', 'primary', 'arrow-right'));
+          ? b('toEvaluate', 'Clore et évaluer', 'ghost') + b('nextRound', `Tour ${state.round + 1} sur ${open} risque${open > 1 ? 's' : ''}`, 'primary', 'arrow-right')
+          : b('toEvaluate', 'Passer à l’évaluation', 'primary', 'arrow-right'));
       }
       break;
     }
@@ -777,8 +827,11 @@ function controls() {
       right = `${b('backResults', 'Revoir les résultats', 'ghost')}<button class="btn primary" data-act="startRound2" ${n ? '' : 'disabled'}>Lancer le tour 2 avec ${n} risque${n > 1 ? 's' : ''}${icon('arrow-right')}</button>`;
       break;
     }
+    case 'evaluate':
+      right = `${b('backRatings', 'Revoir les résultats', 'ghost')}${b('toFinal', 'Valider l’évaluation', 'primary', 'arrow-right')}`;
+      break;
     case 'final':
-      right = `${b('newSession', 'Nouvelle session', 'ghost', 'rotate')}${b('print', 'Imprimer', '', 'printer')}${b('csv', 'Exporter en CSV', 'primary', 'download')}`;
+      right = `${b('backEvaluate', 'Revoir l’évaluation', 'ghost')}` + `${b('newSession', 'Nouvelle session', 'ghost', 'rotate')}${b('print', 'Imprimer', '', 'printer')}${b('csv', 'Exporter en CSV', 'primary', 'download')}`;
       break;
   }
   return `<footer class="controls">${hints}<div class="actions">${right}</div></footer>`;
@@ -842,6 +895,17 @@ const actions = {
       roundRisks: { ...state.roundRisks, [r + 1]: ids },
       feedback: { ...state.feedback, [r + 1]: fb },
     });
+  },
+  toEvaluate: () => setState({ phase: 'evaluate', timer: null, overrides: state.overrides || {} }),
+  backRatings: () => setState({ phase: 'results', resultIndex: 0 }),
+  backEvaluate: () => setState({ phase: 'evaluate' }),
+  decide: (el) => {
+    const { id, d } = el.dataset;
+    const risk = finalResults().find((x) => x.id === id);
+    const overrides = { ...(state.overrides || {}) };
+    if (risk && autoDecision(risk.crit).id === d) delete overrides[id];
+    else overrides[id] = d;
+    setState({ overrides });
   },
   toFinal: () => setState({ phase: 'final', timer: null }),
   csv: exportCsv,
@@ -923,8 +987,8 @@ function tick() {
 
 function exportCsv() {
   const res = finalResults();
-  const head = ['Rang', 'Risque', 'Probabilité médiane', 'Impact médian', 'Criticité', 'Niveau', 'Accord', 'Consensus', 'Dernier tour', 'Mesures proposées'];
-  const rows = res.map((x, i) => [i + 1, x.label, fmt(x.p.median), fmt(x.i.median), fmt(x.crit), x.level?.label, pct(x.agreement), x.consensus ? 'Oui' : 'Non', x.lastRound, x.top.map((m) => m.text).join(' | ')]);
+  const head = ['Rang', 'Risque', 'Fréquence médiane', 'Impact médian', 'Criticité', 'Niveau', 'Décision', 'Accord', 'Consensus', 'Dernier tour', 'Mesures proposées'];
+  const rows = res.map((x, i) => [i + 1, x.label, fmt(x.p.median), fmt(x.i.median), fmt(x.crit), x.level?.label, decisionOf(x).label, pct(x.agreement), x.consensus ? 'Oui' : 'Non', x.lastRound, x.top.map((m) => m.text).join(' | ')]);
   const csv = [head, ...rows].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');

@@ -39,6 +39,7 @@ export const STEPS = [
   { id: 'a2', label: 'Analyse' },
   { id: 'r3', label: 'Tour 3+' },
   { id: 'a3', label: 'Consensus' },
+  { id: 'eval', label: 'Évaluation' },
   { id: 'end', label: 'Résultat' },
 ];
 
@@ -67,8 +68,8 @@ export const ROUND1_QUESTIONS = [
 
 export const SCALES = {
   p: {
-    label: 'Probabilité',
-    steps: ['Très improbable', 'Peu probable', 'Possible', 'Probable', 'Quasi certain'],
+    label: 'Fréquence',
+    steps: ['Très rare', 'Rare', 'Occasionnelle', 'Fréquente', 'Très fréquente'],
   },
   i: {
     label: 'Impact',
@@ -77,7 +78,7 @@ export const SCALES = {
 };
 
 export const RULES = {
-  // Consensus : au moins 70 % des réponses à ±1 de la médiane, en probabilité et en impact
+  // Consensus : au moins 70 % des réponses à ±1 de la médiane, en fréquence et en impact
   consensusShare: 0.7,
   // Au tour 3, un écart de 2 points ou plus avec la médiane exige une justification
   justifyGap: 2,
@@ -86,6 +87,18 @@ export const RULES = {
   interlude: 10,
   maxRisks: 8,
 };
+
+// Critères d'évaluation de MecaParts : on compare la criticité à ces seuils pour décider
+export const EVAL_CRITERIA = [
+  { id: 'now', min: 15, range: '15 à 25', label: 'Traiter en priorité', text: 'Plan d’action immédiat avec un responsable nommé' },
+  { id: 'treat', min: 10, range: '10 à 14', label: 'À traiter', text: 'Mesures planifiées avant le démarrage de la ligne' },
+  { id: 'watch', min: 5, range: '5 à 9', label: 'À surveiller', text: 'Indicateur de suivi et revue chaque mois' },
+  { id: 'accept', min: 0, range: '1 à 4', label: 'Accepter', text: 'On garde les moyens de maîtrise existants' },
+];
+export const decisionById = Object.fromEntries(EVAL_CRITERIA.map((c) => [c.id, c]));
+export function autoDecision(crit) {
+  return EVAL_CRITERIA.find((c) => (crit ?? 0) >= c.min) || EVAL_CRITERIA[EVAL_CRITERIA.length - 1];
+}
 
 export function levelOf(crit) {
   if (crit >= 15) return { id: 'crit', label: 'Critique' };
