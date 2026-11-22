@@ -8,18 +8,18 @@ Une plateforme pour faire vivre la méthode Delphi à la classe. L'écran du pro
 |---|---|---|
 | Scénario | Présentation de MecaParts Maroc et frise des 12 semaines | En attente |
 | Inscription | QR code, code de session, compteur en direct par département | Prénom et département |
-| Tour 1 : identification | 4 questions ouvertes de 3 min chacune, à passer avec « Question suivante » | Réponse libre, un élément par ligne |
+| Tour 1 : identification | 3 questions ouvertes de 3 min chacune, à passer avec « Question suivante » | Réponse libre, un élément par ligne |
 | Analyse | Compte à rebours de 10 s, réponses regroupées par thème, réponses répétées, constats automatiques | En attente |
 | Consolidation | Liste des risques sans doublons, jusqu'à 8 risques à garder, ajout possible | En attente |
-| Tour 2 : notation | Un risque à la fois, temps réglable | Fréquence et gravité de 1 à 5 |
+| Tour 2 : notation | Un risque à la fois, temps réglable | Probabilité et gravité de 1 à 5 |
 | Analyse | Matrice des risques, classement, accord, répartition des notes | En attente |
 | Tour 3 : ajustement | Même liste, avec la médiane du tour 2 | Nouvelle note, justification obligatoire si l'écart à la médiane est de 2 points ou plus, mesure de maîtrise |
 | Consensus | Convergence des avis entre le tour 2 et le tour 3 | En attente |
 | Tour supplémentaire | Proposé seulement sur les risques sans consensus | Comme au tour 3 |
-| Évaluation (ISO 31000) | Chaque risque placé dans la grille de notation du cours (fréquence × gravité) : priorité 1, 2 ou 3. L'animateur peut modifier une décision | En attente |
+| Évaluation (ISO 31000) | Chaque risque placé dans la grille de notation du cours (probabilité × gravité) : priorité 1, 2 ou 3. L'animateur peut modifier une décision | En attente |
 | Résultat | Liste hiérarchisée avec niveaux, décisions et mesures, export CSV, impression | Fin |
 
-Règle de consensus : au moins 70 % des avis à ±1 de la médiane, en fréquence et en gravité.
+Règle de consensus : au moins 70 % des avis à ±1 de la médiane, en probabilité et en gravité.
 
 Raccourcis clavier au projecteur : `→` pour passer à la suite, `Espace` pour mettre en pause, `F` pour le plein écran.
 

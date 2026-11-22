@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES } from './content.js?v=202611221322';
-import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221322';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221322';
-import { uid, aiGroup } from './store.js?v=202611221322';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221322';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES } from './content.js?v=202611221346';
+import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221346';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221346';
+import { uid, aiGroup } from './store.js?v=202611221346';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221346';
 
 const app = document.getElementById('app');
 let store;
@@ -541,7 +541,7 @@ function questionStage() {
 function scalesLegend(fb) {
   const row = (k) => `<div class="legend-row"><span class="legend-name">${SCALES[k].label}</span>${SCALES[k].steps.map((s, i) => `<span class="legend-step"><b class="num">${i + 1}</b>${esc(s)}</span>`).join('')}</div>`;
   return `<div class="legend">${row('p')}${row('i')}</div>
-    ${fb ? `<p class="feedback">Médiane du groupe au tour précédent : fréquence <b class="num">${fmt(fb.p)}</b>, gravité <b class="num">${fmt(fb.i)}</b></p>` : ''}`;
+    ${fb ? `<p class="feedback">Médiane du groupe au tour précédent : probabilité <b class="num">${fmt(fb.p)}</b>, gravité <b class="num">${fmt(fb.i)}</b></p>` : ''}`;
 }
 
 function liveAnalysis() {
@@ -802,17 +802,17 @@ function matrixSvg(ranked) {
     });
   }
   const dots = pts.map((pt, idx) => `<g class="spot ${idx === 0 ? 'lead' : ''}" style="--i:${idx}" data-rank="${idx}" data-tip="${esc(`${idx + 1}. ${ranked[idx].label} · criticité ${fmt(ranked[idx].crit)}`)}">${idx === 0 ? `<circle class="ring" cx="${pt.x}" cy="${pt.y}" r="15"/>` : ''}<circle cx="${pt.x}" cy="${pt.y}" r="15"/><text x="${pt.x}" y="${pt.y + 5}">${idx + 1}</text></g>`).join('');
-  return `<svg viewBox="0 0 ${L + 5 * S + 20} ${T + 5 * S + 60}" class="matrix" role="img" aria-label="Grille de notation fréquence gravité">
+  return `<svg viewBox="0 0 ${L + 5 * S + 20} ${T + 5 * S + 60}" class="matrix" role="img" aria-label="Grille de notation probabilité gravité">
     <text x="${L - 40}" y="${T - 10}" class="ax-title" text-anchor="start">Gravité</text>
     ${cells}${axes}${dots}
-    <text x="${L + 5 * S}" y="${T + 5 * S + 52}" class="ax-title" text-anchor="end">Fréquence</text>
+    <text x="${L + 5 * S}" y="${T + 5 * S + 52}" class="ax-title" text-anchor="end">Probabilité</text>
   </svg>
   <div class="levels">${EVAL_CRITERIA.map((c) => `<span><i class="sw ${c.id}"></i>${c.label}</span>`).join('')}</div>`;
 }
 
 function rankTable(ranked) {
   return `<table class="rank">
-    <thead><tr><th>#</th><th>Risque</th><th class="r">F</th><th class="r">G</th><th class="r">Criticité</th><th class="r">Accord</th></tr></thead>
+    <thead><tr><th>#</th><th>Risque</th><th class="r">P</th><th class="r">G</th><th class="r">Criticité</th><th class="r">Accord</th></tr></thead>
     <tbody>${ranked.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
       <td class="num muted">${i + 1}</td>
       <td>${esc(x.label)}</td>
@@ -822,7 +822,7 @@ function rankTable(ranked) {
       <td class="r num ${x.consensus ? 'ok' : 'warn'}">${pct(x.agreement)}</td>
     </tr>`).join('')}</tbody>
   </table>
-  <p class="muted small">Accord : part des avis à ±1 de la médiane. Consensus à partir de ${pct(RULES.consensusShare)} en fréquence et en gravité.</p>`;
+  <p class="muted small">Accord : part des avis à ±1 de la médiane. Consensus à partir de ${pct(RULES.consensusShare)} en probabilité et en gravité.</p>`;
 }
 
 function histCard(x, rank) {
@@ -835,7 +835,7 @@ function histCard(x, rank) {
   };
   return `<article class="panel hcard" style="--i:${i}">
     <header><span class="num muted">${rank}</span><h4>${esc(x.label)}</h4><span class="tag ${x.consensus ? 'ok' : 'warn'}">${x.consensus ? 'Consensus' : 'Divergence'}</span></header>
-    <div class="hists">${hist(x.p, 'Fréquence')}${hist(x.i, 'Gravité')}</div>
+    <div class="hists">${hist(x.p, 'Probabilité')}${hist(x.i, 'Gravité')}</div>
     <p class="muted small num">${x.n} avis · écart interquartile ${fmt(x.p.iqr)} et ${fmt(x.i.iqr)}</p>
   </article>`;
 }
@@ -909,7 +909,7 @@ function evaluateStage() {
       <div class="panel">
         <h3>Critères de risque <span class="muted">grille de notation du cours</span></h3>
         <ol class="criteria">${criteria}</ol>
-        <p class="muted small">La priorité vient de la case de la grille où tombe le risque : fréquence médiane et gravité médiane. La criticité affichée est fréquence × gravité, sur 25.</p>
+        <p class="muted small">La priorité vient de la case de la grille où tombe le risque : probabilité médiane et gravité médiane. La criticité affichée est probabilité × gravité, sur 25.</p>
       </div>
       <div class="panel">
         <h3>Décision par risque <span class="muted">classés par priorité puis criticité</span></h3>
@@ -934,7 +934,7 @@ function finalStage() {
     <div class="res-grid wide-left">
       <div class="panel">
         <table class="rank final-table">
-          <thead><tr><th>#</th><th>Risque</th><th class="r">F</th><th class="r">G</th><th class="r">Criticité</th><th>Décision</th><th>Mesures de maîtrise proposées</th></tr></thead>
+          <thead><tr><th>#</th><th>Risque</th><th class="r">P</th><th class="r">G</th><th class="r">Criticité</th><th>Décision</th><th>Mesures de maîtrise proposées</th></tr></thead>
           <tbody>${res.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
             <td class="num muted">${i + 1}</td>
             <td><span class="rname">${esc(x.label)}</span><span class="muted small">${x.consensus ? 'Consensus' : 'Sans consensus'} · tour ${x.lastRound}</span></td>
@@ -1160,7 +1160,7 @@ function tick() {
 
 function exportCsv() {
   const res = finalResults().sort((a, b) => Number(decisionOf(a).id.slice(1)) - Number(decisionOf(b).id.slice(1)) || b.crit - a.crit);
-  const head = ['Rang', 'Risque', 'Fréquence médiane', 'Gravité médiane', 'Criticité', 'Priorité', 'Décision', 'Accord', 'Consensus', 'Dernier tour', 'Mesures proposées'];
+  const head = ['Rang', 'Risque', 'Probabilité médiane', 'Gravité médiane', 'Criticité', 'Priorité', 'Décision', 'Accord', 'Consensus', 'Dernier tour', 'Mesures proposées'];
   const rows = res.map((x, i) => [i + 1, x.label, fmt(x.p.median), fmt(x.i.median), fmt(x.crit), decisionOf(x).label, decisionOf(x).action, pct(x.agreement), x.consensus ? 'Oui' : 'Non', x.lastRound, x.top.map((m) => m.text).join(' | ')]);
   const csv = [head, ...rows].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });

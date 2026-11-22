@@ -1,9 +1,9 @@
 // Écran téléphone : l'étudiant rejoint, puis répond à chaque question du tour en cours.
-import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES } from './content.js?v=202611221322';
-import { fmt } from './analysis.js?v=202611221322';
-import { icon, esc, mmss } from './ui.js?v=202611221322';
-import { uid } from './store.js?v=202611221322';
-import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221322';
+import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES } from './content.js?v=202611221346';
+import { fmt } from './analysis.js?v=202611221346';
+import { icon, esc, mmss } from './ui.js?v=202611221346';
+import { uid } from './store.js?v=202611221346';
+import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221346';
 
 const app = document.getElementById('app');
 let store;
@@ -231,8 +231,8 @@ function ratingForm(q, draft) {
     </fieldset>`;
   return `
     ${fb ? `<div class="fb">
-      <p><span class="muted">Médiane du groupe, tour ${state.round - 1}</span><b class="num">F ${fmt(fb.p)} · G ${fmt(fb.i)}</b></p>
-      ${prev ? `<p><span class="muted">Votre note</span><b class="num">F ${prev.p} · G ${prev.i}</b></p>` : ''}
+      <p><span class="muted">Médiane du groupe, tour ${state.round - 1}</span><b class="num">P ${fmt(fb.p)} · G ${fmt(fb.i)}</b></p>
+      ${prev ? `<p><span class="muted">Votre note</span><b class="num">P ${prev.p} · G ${prev.i}</b></p>` : ''}
     </div>` : ''}
     ${scale('p')}${scale('i')}
     ${state.round >= 3 ? `
@@ -285,7 +285,7 @@ function bindForm(q, key, draft) {
       if (!text) return showError(status, 'Écrivez au moins une réponse');
       payload = { text };
     } else {
-      if (!draft.p || !draft.i) return showError(status, 'Choisissez une note en fréquence et en gravité');
+      if (!draft.p || !draft.i) return showError(status, 'Choisissez une note en probabilité et en gravité');
       if (needsWhy(q, draft) && !String(draft.why || '').trim()) return showError(status, 'Ajoutez une justification');
       payload = { p: draft.p, i: draft.i };
       if (state.round >= 3) {

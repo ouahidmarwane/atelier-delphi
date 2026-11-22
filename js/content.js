@@ -59,17 +59,12 @@ export const ROUND1_QUESTIONS = [
     title: 'Quelles conséquences pour l’entreprise si ces risques se réalisent ?',
     hint: 'Une conséquence par ligne',
   },
-  {
-    key: 'q4',
-    title: 'Que perd l’entreprise si le projet échoue ?',
-    hint: 'Pensez aux opportunités : le client, le marché, la réputation',
-  },
 ];
 
 export const SCALES = {
   p: {
-    label: 'Fréquence',
-    steps: ['Très rare', 'Rare', 'Occasionnelle', 'Fréquente', 'Très fréquente'],
+    label: 'Probabilité',
+    steps: ['Très improbable', 'Peu probable', 'Possible', 'Probable', 'Quasi certain'],
   },
   i: {
     label: 'Gravité',
@@ -78,7 +73,7 @@ export const SCALES = {
 };
 
 export const RULES = {
-  // Consensus : au moins 70 % des réponses à ±1 de la médiane, en fréquence et en gravité
+  // Consensus : au moins 70 % des réponses à ±1 de la médiane, en probabilité et en gravité
   consensusShare: 0.7,
   // Au tour 3, un écart de 2 points ou plus avec la médiane exige une justification
   justifyGap: 2,
@@ -88,7 +83,7 @@ export const RULES = {
   maxRisks: 8,
 };
 
-// Grille de notation du cours : la priorité dépend de la case fréquence × gravité
+// Grille de notation du cours : la priorité dépend de la case probabilité × gravité
 export function priorityOf(f, g) {
   const F = Math.round(f ?? 0);
   const G = Math.round(g ?? 0);
@@ -99,9 +94,9 @@ export function priorityOf(f, g) {
 
 // Critères d'évaluation : chaque priorité de la grille correspond à une décision
 export const EVAL_CRITERIA = [
-  { id: 'p1', label: 'Priorité 1', action: 'Traiter en priorité', zone: 'Gravité 4 ou 5, ou gravité 3 avec fréquence 4 ou 5', text: 'Plan d’action immédiat avec un responsable nommé' },
-  { id: 'p2', label: 'Priorité 2', action: 'À traiter', zone: 'Gravité 3 avec fréquence 1 à 3, ou gravité 1 ou 2 avec fréquence 3 à 5', text: 'Mesures planifiées avant le démarrage et suivi régulier' },
-  { id: 'p3', label: 'Priorité 3', action: 'À surveiller', zone: 'Gravité 1 ou 2 avec fréquence 1 ou 2', text: 'On garde les moyens de maîtrise existants' },
+  { id: 'p1', label: 'Priorité 1', action: 'Traiter en priorité', zone: 'Gravité 4 ou 5, ou gravité 3 avec probabilité 4 ou 5', text: 'Plan d’action immédiat avec un responsable nommé' },
+  { id: 'p2', label: 'Priorité 2', action: 'À traiter', zone: 'Gravité 3 avec probabilité 1 à 3, ou gravité 1 ou 2 avec probabilité 3 à 5', text: 'Mesures planifiées avant le démarrage et suivi régulier' },
+  { id: 'p3', label: 'Priorité 3', action: 'À surveiller', zone: 'Gravité 1 ou 2 avec probabilité 1 ou 2', text: 'On garde les moyens de maîtrise existants' },
 ];
 export const decisionById = Object.fromEntries(EVAL_CRITERIA.map((c) => [c.id, c]));
 export function autoDecision(x) {

@@ -1,5 +1,5 @@
 // Analyse des réponses en temps réel : thèmes, doublons, statistiques et constats.
-import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221322';
+import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221346';
 
 export function normalize(text) {
   return ' ' + String(text || '')
@@ -173,7 +173,7 @@ export function insightsRatings(results, previous) {
   const ok = results.filter((r) => r.consensus);
   out.push(`${ok.length} risque${ok.length > 1 ? 's' : ''} sur ${results.length} ${ok.length > 1 ? 'font' : 'fait'} consensus`);
   const pr = (r) => Number(String(r.level?.id || 'p9').slice(1));
-  const ranked = [...results].filter((r) => r.crit != null).sort((a, b) => pr(a) - pr(b) || b.crit - a.crit);
+  const ranked = [...results].filter((r) => r.crit != null).sort((a, b) => pr(a) - pr(b) || b.crit - a.crit || b.agreement - a.agreement);
   if (ranked[0]) out.push(`Le plus critique : ${lower(ranked[0].label)}, ${ranked[0].level?.label.toLowerCase()}, criticité ${fmt(ranked[0].crit)} sur 25`);
   const p1 = results.filter((r) => r.level?.id === 'p1').length;
   if (p1) out.push(`${p1} risque${p1 > 1 ? 's tombent' : ' tombe'} en priorité 1 dans la grille de notation`);
