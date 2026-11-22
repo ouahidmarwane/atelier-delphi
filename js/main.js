@@ -1,5 +1,5 @@
 // Point d'entrée : #/join/CODE pour les téléphones, tout le reste pour l'écran animateur.
-import { createStore } from './store.js?v=202611221346';
+import { createStore } from './store.js?v=202611221401';
 
 const store = await createStore();
 
@@ -7,10 +7,10 @@ async function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [view, code] = hash.split('/');
   if (view === 'join') {
-    const { startPlayer } = await import('./player.js?v=202611221346');
+    const { startPlayer } = await import('./player.js?v=202611221401');
     return startPlayer(store, code || null);
   }
-  const { startHost } = await import('./host.js?v=202611221346');
+  const { startHost } = await import('./host.js?v=202611221401');
   return startHost(store, view === 'host' ? code : null);
 }
 

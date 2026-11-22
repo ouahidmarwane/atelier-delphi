@@ -1,5 +1,5 @@
 // Analyse des réponses en temps réel : thèmes, doublons, statistiques et constats.
-import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221346';
+import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221401';
 
 export function normalize(text) {
   return ' ' + String(text || '')
@@ -96,17 +96,7 @@ function orderDepts(set) {
 // Liste des risques candidats après le tour 1 (question des risques + question des pertes)
 export function candidateRisks(answers, people) {
   const q1 = analyzeOpen(answers.filter((a) => a.qkey === 'q1'), people);
-  const q4 = analyzeOpen(answers.filter((a) => a.qkey === 'q4'), people);
-  const merged = new Map(q1.themes.map((t) => [t.id, { ...t }]));
-  for (const t of q4.themes) {
-    if (t.id !== 'client') continue;
-    const cur = merged.get(t.id);
-    if (cur) {
-      cur.count += t.count;
-      cur.depts = orderDepts(new Set([...cur.depts, ...t.depts]));
-    } else merged.set(t.id, { ...t });
-  }
-  const list = [...merged.values()].sort((a, b) => b.depts.length - a.depts.length || b.count - a.count);
+  const list = [...q1.themes].sort((a, b) => b.depts.length - a.depts.length || b.count - a.count);
   return { list, unmatched: q1.other };
 }
 

@@ -88,9 +88,10 @@ Consignes :
 1. Pour chaque question, regroupe les réponses qui expriment la même idée, même si la formulation, l'orthographe ou les fautes de frappe diffèrent.
 2. Chaque id appartient à un seul groupe, dans la question où il est posé. N'oublie aucun id et n'invente aucun id.
 3. Pour la question q1 (les risques), si un groupe correspond à un risque du catalogue, mets son identifiant dans "theme" et reprends exactement son intitulé dans "label". Sinon laisse "theme" vide et écris un intitulé court de risque, en français, commençant par une majuscule, sans point final.
-4. Pour les autres questions, laisse "theme" vide et donne à chaque groupe un intitulé court et précis en français.
-5. Ne fusionne pas deux idées différentes juste parce qu'elles concernent le même service.
-6. Une réponse vide de sens ou hors sujet forme un groupe "Hors sujet".`;
+4. Pour la question q4 (les mesures proposées), donne à chaque groupe un intitulé court de mesure, et mets dans "theme" l'identifiant du risque du catalogue que cette mesure réduit, seulement si c'est clair.
+5. Pour les autres questions, laisse "theme" vide et donne à chaque groupe un intitulé court et précis en français.
+6. Ne fusionne pas deux idées différentes juste parce qu'elles concernent le même service.
+7. Une réponse vide de sens ou hors sujet forme un groupe "Hors sujet".`;
 }
 
 async function callGemini(key: string, model: string, p: Payload, thinking: string | null = "low", ms = 28000, promptText?: string) {

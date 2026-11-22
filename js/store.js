@@ -1,5 +1,5 @@
 // Couche de données : même interface pour Supabase (vraie séance) et pour le mode répétition local.
-import { CONFIG } from './config.js?v=202611221346';
+import { CONFIG } from './config.js?v=202611221401';
 
 const answerKey = (r) => `${r.participant_id}|${r.round}|${r.qkey}`;
 
@@ -16,7 +16,7 @@ export async function createStore() {
 }
 
 async function supabaseStore() {
-  const { createClient } = await import('../vendor/supabase.mjs?v=202611221346');
+  const { createClient } = await import('../vendor/supabase.mjs?v=202611221401');
   const sb = createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
     realtime: { params: { eventsPerSecond: 20 } },
   });

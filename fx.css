@@ -326,3 +326,35 @@ body { background: var(--bg); }
 .ai-badge.error { background: var(--raised); color: var(--text-3); }
 .spin { width: 0.75rem; height: 0.75rem; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: rotate 0.8s linear infinite; }
 .new-tag { margin-left: 0.5rem; font-size: 0.72rem; padding: 0.05rem 0.4rem; border-radius: 0.3rem; background: rgba(124, 92, 196, 0.12); color: #5b47b0; font-weight: 500; vertical-align: middle; }
+
+/* Retour du groupe : médiane en grand et arguments anonymes */
+.median-board { margin-top: 1.2rem; max-width: 60rem; background: var(--card); border: 1px solid var(--line); border-radius: 1rem; padding: 1.2rem 1.4rem; box-shadow: 0 14px 40px -26px rgba(23, 23, 23, 0.3); animation: rise 0.5s var(--ease) both; }
+.med-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 500; color: var(--text-2); margin-bottom: 0.8rem; }
+.med-row { display: flex; align-items: stretch; gap: 1rem; }
+.med-cell { display: grid; justify-items: start; gap: 0.15rem; padding: 0.8rem 1.2rem; border-radius: 0.8rem; background: color-mix(in srgb, var(--accent) 7%, white); min-width: 11rem; }
+.med-label { font-size: 0.9rem; color: var(--text-2); }
+.med-value { font-size: 4.6rem; font-weight: 500; line-height: 1; letter-spacing: -0.03em; color: var(--accent-ink); animation: pop-chip 0.6s var(--ease) both; }
+.med-step { font-size: 0.9rem; color: var(--text-2); }
+.med-x { align-self: center; font-size: 2rem; color: var(--text-3); }
+.med-cell.prio { margin-left: auto; background: color-mix(in srgb, var(--dc) 16%, white); }
+.med-cell.prio .med-value { color: color-mix(in srgb, var(--dc) 75%, black); font-size: 3.6rem; }
+.args { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line); }
+.args-title { font-size: 0.9rem; font-weight: 500; color: var(--text-2); }
+.args ul { display: grid; gap: 0.5rem; margin-top: 0.6rem; }
+.args li { display: grid; grid-template-columns: 13rem 1fr; gap: 1rem; align-items: baseline; animation: rise 0.45s var(--ease) both; animation-delay: calc(var(--i) * 120ms + 300ms); }
+.args q { font-size: 1.12rem; color: var(--text); quotes: '« ' ' »'; }
+.arg-dir { font-size: 0.85rem; font-weight: 500; white-space: nowrap; }
+.arg-dir.up { color: #b3261e; } .arg-dir.down { color: #2e7d4f; }
+.arg-dir b { font-weight: 500; margin-left: 0.3rem; }
+.args-none { margin-top: 0.8rem; }
+/* Téléphone */
+.fb { display: grid; gap: 0.6rem; padding: 0.9rem 1rem; }
+.fb-title { font-size: 0.85rem; font-weight: 500; color: var(--accent-ink); }
+.fb-big { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.fb-big span { display: grid; background: var(--card); border-radius: 0.6rem; padding: 0.5rem 0.75rem; }
+.fb-big em { font-style: normal; font-size: 0.8rem; color: var(--text-2); }
+.fb-big b { font-family: var(--mono); font-size: 2.4rem; font-weight: 500; line-height: 1.1; color: var(--accent-ink); }
+.fb-mine { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.88rem; }
+.fb-args { display: grid; gap: 0.45rem; font-size: 0.9rem; padding-top: 0.55rem; border-top: 1px dashed rgba(217, 72, 15, 0.35); }
+.fb-args p { display: grid; gap: 0.1rem; }
+.fb-args .arg-dir { font-size: 0.78rem; }

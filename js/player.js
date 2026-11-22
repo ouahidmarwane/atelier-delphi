@@ -1,9 +1,9 @@
 // Écran téléphone : l'étudiant rejoint, puis répond à chaque question du tour en cours.
-import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES } from './content.js?v=202611221346';
-import { fmt } from './analysis.js?v=202611221346';
-import { icon, esc, mmss } from './ui.js?v=202611221346';
-import { uid } from './store.js?v=202611221346';
-import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221346';
+import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES } from './content.js?v=202611221401';
+import { fmt } from './analysis.js?v=202611221401';
+import { icon, esc, mmss } from './ui.js?v=202611221401';
+import { uid } from './store.js?v=202611221401';
+import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221401';
 
 const app = document.getElementById('app');
 let store;
@@ -229,15 +229,21 @@ function ratingForm(q, draft) {
       <legend><span>${SCALES[k].label}</span><span class="sel muted" data-sel="${k}">${draft[k] ? esc(SCALES[k].steps[draft[k] - 1]) : 'Choisissez une note'}</span></legend>
       <div class="seg">${[1, 2, 3, 4, 5].map((v) => `<button type="button" class="${draft[k] === v ? 'on' : ''} ${fb && Math.round(fb[k]) === v ? 'med' : ''}" data-k="${k}" data-v="${v}" aria-pressed="${draft[k] === v}">${v}</button>`).join('')}</div>
     </fieldset>`;
+  const args = fb?.args || [];
   return `
     ${fb ? `<div class="fb">
-      <p><span class="muted">Médiane du groupe, tour ${state.round - 1}</span><b class="num">P ${fmt(fb.p)} · G ${fmt(fb.i)}</b></p>
-      ${prev ? `<p><span class="muted">Votre note</span><b class="num">P ${prev.p} · G ${prev.i}</b></p>` : ''}
+      <span class="fb-title">Médiane du groupe au tour ${state.round - 1}</span>
+      <div class="fb-big">
+        <span><em>Probabilité</em><b class="num">${fmt(fb.p)}</b></span>
+        <span><em>Gravité</em><b class="num">${fmt(fb.i)}</b></span>
+      </div>
+      ${prev ? `<p class="fb-mine"><span class="muted">Votre note au tour ${state.round - 1}</span><b class="num">P ${prev.p} · G ${prev.i}</b></p>` : ''}
+      ${args.length ? `<div class="fb-args"><span class="muted">Arguments anonymes des avis éloignés</span>${args.map((a) => `<p><span class="arg-dir ${a.dir}">${a.dir === 'up' ? 'Plus haut' : 'Plus bas'} · P ${a.p} · G ${a.i}</span>${esc(a.why)}</p>`).join('')}</div>` : ''}
     </div>` : ''}
     ${scale('p')}${scale('i')}
+    <label class="field" data-why-wrap><span data-why-label>Pourquoi cette note ? <em class="muted">facultatif</em></span>
+      <textarea name="why" rows="2" maxlength="300" placeholder="Votre argument sera montré au groupe, sans votre nom">${esc(draft.why || '')}</textarea></label>
     ${state.round >= 3 ? `
-      <label class="field" data-why-wrap><span data-why-label>Justification <em class="muted">facultative</em></span>
-        <textarea name="why" rows="3" maxlength="300" placeholder="Pourquoi cette note ?">${esc(draft.why || '')}</textarea></label>
       <label class="field"><span>Mesure de maîtrise proposée <em class="muted">facultative</em></span>
         <input name="measure" maxlength="120" value="${esc(draft.measure || '')}" placeholder="Ex. qualifier un second fournisseur"></label>` : ''}`;
 }
@@ -256,7 +262,7 @@ function bindForm(q, key, draft) {
     if (!lab) return;
     lab.innerHTML = needsWhy(q, draft)
       ? 'Justification <em class="req">obligatoire, votre note s’écarte de la médiane</em>'
-      : 'Justification <em class="muted">facultative</em>';
+      : 'Pourquoi cette note ? <em class="muted">facultatif</em>';
   };
   syncWhy();
   form.addEventListener('input', (e) => {
@@ -288,10 +294,8 @@ function bindForm(q, key, draft) {
       if (!draft.p || !draft.i) return showError(status, 'Choisissez une note en probabilité et en gravité');
       if (needsWhy(q, draft) && !String(draft.why || '').trim()) return showError(status, 'Ajoutez une justification');
       payload = { p: draft.p, i: draft.i };
-      if (state.round >= 3) {
-        if (String(draft.why || '').trim()) payload.why = draft.why.trim();
-        if (String(draft.measure || '').trim()) payload.measure = draft.measure.trim();
-      }
+      if (String(draft.why || '').trim()) payload.why = draft.why.trim();
+      if (state.round >= 3 && String(draft.measure || '').trim()) payload.measure = draft.measure.trim();
     }
     sending = true;
     const btn = form.querySelector('[data-send]');

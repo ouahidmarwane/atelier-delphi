@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES } from './content.js?v=202611221346';
-import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221346';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221346';
-import { uid, aiGroup } from './store.js?v=202611221346';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221346';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221401';
+import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221401';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221401';
+import { uid, aiGroup } from './store.js?v=202611221401';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221401';
 
 const app = document.getElementById('app');
 let store;
@@ -212,7 +212,8 @@ async function runAi() {
     for (const q of out.questions || []) {
       groups[q.q] = (q.groups || []).map((g) => ({
         label: g.label,
-        theme: themeById[g.theme] ? g.theme : '',
+        theme: themeById[g.theme] && q.q !== 'q4' ? g.theme : '',
+        target: themeById[g.theme] ? g.theme : '',
         refs: g.ids.map((id) => byId[id]).filter(Boolean).map((r) => `${r.pid}|${r.q}|${r.k}`),
       }));
     }
@@ -238,10 +239,11 @@ function aiOpen(qkey, rows, ppl) {
   const groups = ai.groups[qkey] || [];
   const where = new Map();
   groups.forEach((g, gi) => g.refs.forEach((r) => where.set(r, gi)));
+  const measures = qkey === 'q4';
   const themes = groups.map((g, gi) => ({
-    id: g.theme || 'ai-' + slug(g.label) || 'ai-' + gi,
-    label: g.theme ? themeById[g.theme].label : g.label,
-    count: 0, people: new Set(), depts: new Set(), samples: [], ai: !g.theme, off: offTopic(g.label),
+    id: measures ? 'm-' + slug(g.label) + '-' + gi : g.theme || 'ai-' + slug(g.label) || 'ai-' + gi,
+    label: g.theme && !measures ? themeById[g.theme].label : g.label,
+    count: 0, people: new Set(), depts: new Set(), samples: [], ai: !g.theme && !measures, off: offTopic(g.label),
   }));
   const other = [];
   let lines = 0;
@@ -297,9 +299,41 @@ function finalResults() {
     const rated = rounds.filter((r) => state.roundRisks[r].includes(risk.id));
     const last = rated[rated.length - 1];
     const res = analyzeRatings(answersOf(last), [risk])[0];
-    const measures = rated.filter((r) => r >= 3).flatMap((r) => analyzeRatings(answersOf(r), [risk])[0].measures);
+    const measures = [...round1Measures(risk.id), ...rated.filter((r) => r >= 3).flatMap((r) => analyzeRatings(answersOf(r), [risk])[0].measures)];
     return { ...res, lastRound: last, rounds: rated.length, top: topMeasures(measures, 2) };
   }).filter((r) => r.n).sort(byPriority);
+}
+
+// Arguments anonymes renvoyés au groupe : d'abord ceux des avis les plus éloignés de la médiane
+function argsFor(round, x) {
+  const rows = answersOf(round).filter((a) => a.qkey === x.id && a.payload?.why);
+  const scored = rows.map((a) => {
+    const dp = a.payload.p - x.p.median;
+    const di = a.payload.i - x.i.median;
+    return { p: a.payload.p, i: a.payload.i, why: String(a.payload.why).slice(0, 160), gap: Math.max(Math.abs(dp), Math.abs(di)), dir: dp + di >= 0 ? 'up' : 'down' };
+  }).sort((a, b) => b.gap - a.gap);
+  const seen = new Set();
+  const out = [];
+  for (const s of scored) {
+    const k = normalize(s.why).trim();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+    if (out.length === 3) break;
+  }
+  return out;
+}
+
+// Mesures proposées au tour 1 qui visent ce risque (par l'IA, sinon par les mots-clés)
+function round1Measures(riskId) {
+  const out = [];
+  const rows = answersOf(1).filter((a) => a.qkey === 'q4');
+  if (ai?.status === 'ok' && ai.groups?.q4) {
+    for (const g of ai.groups.q4) if (g.target === riskId) for (let k = 0; k < g.refs.length; k++) out.push(g.label);
+    return out;
+  }
+  for (const a of rows) for (const line of splitLines(a.payload?.text)) if (matchThemes(line).includes(riskId)) out.push(line);
+  return out;
 }
 
 // ---------- Rendu ----------
@@ -531,17 +565,35 @@ function questionStage() {
     <div class="q-main">
       <p class="eyebrow">Tour ${state.round} · ${label} · ${rating ? 'Risque' : 'Question'} ${state.qIndex + 1} sur ${qs.length}</p>
       <h1 class="q-title">${esc(q.title)}</h1>
-      ${rating ? scalesLegend(fb) : `<p class="q-hint">${esc(q.hint)}</p>`}
+      ${rating ? (fb ? medianBoard(fb) : scalesLegend()) : `<p class="q-hint">${esc(q.hint)}</p>`}
       <div class="live" data-live>${liveAnalysis()}</div>
     </div>
     <div class="q-side">${dial('lg')}</div>
   </section>`;
 }
 
-function scalesLegend(fb) {
+function scalesLegend() {
   const row = (k) => `<div class="legend-row"><span class="legend-name">${SCALES[k].label}</span>${SCALES[k].steps.map((s, i) => `<span class="legend-step"><b class="num">${i + 1}</b>${esc(s)}</span>`).join('')}</div>`;
-  return `<div class="legend">${row('p')}${row('i')}</div>
-    ${fb ? `<p class="feedback">Médiane du groupe au tour précédent : probabilité <b class="num">${fmt(fb.p)}</b>, gravité <b class="num">${fmt(fb.i)}</b></p>` : ''}`;
+  return `<div class="legend">${row('p')}${row('i')}</div>`;
+}
+
+// Retour du groupe : la médiane en grand et les arguments anonymes des avis éloignés
+function medianBoard(fb) {
+  const prio = decisionById[priorityOf(fb.p, fb.i)];
+  const big = (k, v) => `<div class="med-cell"><span class="med-label">${SCALES[k].label}</span><span class="med-value num">${fmt(v)}</span><span class="med-step">${esc(SCALES[k].steps[Math.round(v) - 1] || '')}</span></div>`;
+  const args = fb.args || [];
+  return `
+  <div class="median-board">
+    <div class="med-head"><span>Médiane du groupe au tour ${state.round - 1}</span>${fb.n ? `<span class="muted num">${fb.n} avis</span>` : ''}</div>
+    <div class="med-row">
+      ${big('p', fb.p)}
+      <span class="med-x">×</span>
+      ${big('i', fb.i)}
+      <div class="med-cell prio ${prio.id}"><span class="med-label">Grille</span><span class="med-value">${prio.label.replace('Priorité ', 'P')}</span><span class="med-step">${esc(prio.action)}</span></div>
+    </div>
+    ${args.length ? `<div class="args"><span class="args-title">Arguments anonymes des avis éloignés</span>
+      <ul>${args.map((a, k) => `<li style="--i:${k}"><span class="arg-dir ${a.dir}">${a.dir === 'up' ? 'Note plus haute' : 'Note plus basse'} <b class="num">P ${a.p} · G ${a.i}</b></span><q>${esc(a.why)}</q></li>`).join('')}</ul></div>` : '<p class="muted small args-none">Aucun argument donné au tour précédent</p>'}
+  </div>`;
 }
 
 function liveAnalysis() {
@@ -562,7 +614,7 @@ function liveAnalysis() {
     const pl = (n, one, many) => `<b class="num">${n}</b> ${n > 1 ? many : one}`;
     analysis = `<li>${pl(a.lines, 'idée reçue', 'idées reçues')}</li><li>${pl(a.themes.length, 'thème détecté', 'thèmes détectés')}</li><li>${pl(cross, 'cité par plusieurs départements', 'cités par plusieurs départements')}</li><li>${pl(a.other.length, 'réponse à classer', 'réponses à classer')}</li>`;
   } else {
-    analysis = `<li><b class="num">${rows.length}</b> notes reçues</li><li>Médiane et dispersion révélées à la clôture</li>`;
+    analysis = `<li><b class="num">${rows.length}</b> ${rows.length > 1 ? "notes reçues" : "note reçue"}</li><li>Médiane et dispersion révélées à la clôture</li>`;
   }
   const all = total > 0 && rows.length >= total;
   return `
@@ -613,7 +665,7 @@ function results1Stage() {
     </header>
     <div class="res-grid">
       <div class="panel">
-        <h3>Réponses regroupées par thème <span class="muted num">${a.lines} idées · ${a.respondents} participants</span></h3>
+        <h3>${q.key === 'q4' ? 'Mesures proposées, regroupées' : 'Réponses regroupées par thème'} <span class="muted num">${a.lines} idées · ${a.respondents} participants</span></h3>
         ${shown.length ? `<ol class="tbars">${bars}</ol>` : '<p class="empty">Aucune réponse pour cette question</p>'}
         ${a.themes.length > shown.length ? `<p class="muted small">+ ${a.themes.length - shown.length} autres thèmes</p>` : ''}
         ${a.other.length ? `<p class="muted small">${a.other.length} réponse${a.other.length > 1 ? 's' : ''} hors catalogue, visible${a.other.length > 1 ? 's' : ''} à droite</p>` : ''}
@@ -1061,7 +1113,7 @@ const actions = {
     const r = state.round;
     const results = ratingResults(r);
     const ids = r === 2 ? results.map((x) => x.id) : results.filter((x) => x.n && !x.consensus).map((x) => x.id);
-    const fb = Object.fromEntries(results.map((x) => [x.id, { p: x.p.median, i: x.i.median }]));
+    const fb = Object.fromEntries(results.map((x) => [x.id, { p: x.p.median, i: x.i.median, n: x.n, args: argsFor(r, x) }]));
     startQuestion(r + 1, 0, {
       roundRisks: { ...state.roundRisks, [r + 1]: ids },
       feedback: { ...state.feedback, [r + 1]: fb },
@@ -1269,13 +1321,18 @@ function scheduleBots() {
 
 function botPayload(p, round, q, stubborn = false) {
   if (round === 1) {
-    const lines = shuffle(BOT_LINES[p.dept][q.key]).slice(0, 1 + Math.floor(Math.random() * 3));
+    const lines = shuffle(BOT_LINES[p.dept][q.key]).slice(0, 1 + Math.floor(Math.random() * (q.key === 'q4' ? 2 : 3)));
     return { text: lines.join('\n') };
   }
   const [tp, ti] = TRUTH[q.key] || [2 + (q.key.length % 3), 3];
   const own = (BOT_LINES[p.dept].q1 || []).some((l) => matchThemes(l).includes(q.key));
   const noise = () => pick([-2, -1, -1, 0, 0, 0, 0, 1, 1, 2]);
-  if (round === 2) return { p: clamp(tp + noise()), i: clamp(ti + noise() + (own ? 1 : 0)) };
+  if (round === 2) {
+    const out = { p: clamp(tp + noise()), i: clamp(ti + noise() + (own ? 1 : 0)) };
+    const d = out.p + out.i - tp - ti;
+    if (Math.abs(d) >= 2 && Math.random() < 0.8) out.why = pick(BOT_ARGS[d > 0 ? 'up' : 'down']);
+    return out;
+  }
   const prev = answers.get(`${p.id}|${round - 1}|${q.key}`)?.payload || { p: clamp(tp + noise()), i: clamp(ti + noise()) };
   const fb = state.feedback?.[round]?.[q.key] || { p: tp, i: ti };
   const toward = stubborn
@@ -1284,7 +1341,7 @@ function botPayload(p, round, q, stubborn = false) {
   const np = toward(prev.p, fb.p);
   const ni = toward(prev.i, fb.i);
   const out = { p: np, i: ni };
-  if (Math.abs(np - fb.p) >= RULES.justifyGap || Math.abs(ni - fb.i) >= RULES.justifyGap) out.why = 'Notre département est directement exposé à ce risque';
+  if (Math.abs(np - fb.p) >= RULES.justifyGap || Math.abs(ni - fb.i) >= RULES.justifyGap) out.why = pick(BOT_ARGS[np + ni >= fb.p + fb.i ? 'up' : 'down']);
   if (Math.random() < 0.6) out.measure = Math.random() < 0.75 && BOT_MEASURES[q.key] ? BOT_MEASURES[q.key] : pick(['Nommer un responsable et suivre chaque semaine', 'Prévoir un plan B validé par la direction']);
   return out;
 }

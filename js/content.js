@@ -59,6 +59,12 @@ export const ROUND1_QUESTIONS = [
     title: 'Quelles conséquences pour l’entreprise si ces risques se réalisent ?',
     hint: 'Une conséquence par ligne',
   },
+  {
+    key: 'q4',
+    title: 'Quelles mesures proposez-vous pour réduire ces risques ?',
+    hint: 'Facultatif · une mesure par ligne',
+    optional: true,
+  },
 ];
 
 export const SCALES = {
@@ -168,31 +174,31 @@ export const BOT_LINES = {
     q1: ['Retard du démarrage de la ligne', 'Arrêt imprévu de la production', 'Capacité de l’usine déjà saturée à 85 %', 'Non-respect du programme de production', 'Déséquilibre de la ligne au démarrage'],
     q2: ['Machines livrées en retard', 'Planification trop serrée sur 3 mois', 'Opérateurs pas encore formés', 'Mauvaise organisation des postes'],
     q3: ['Pénalités de 2 % par semaine', 'Retard de livraison au client', 'Baisse de productivité'],
-    q4: ['Le contrat sur 3 ans', 'La confiance du constructeur', 'Des futures commandes'],
+    q4: ['Démarrage progressif avec une équipe pilote', 'Ajouter une équipe de nuit pendant le lancement', 'Réunion de pilotage chaque semaine'],
   },
   supply: {
     q1: ['Rupture de matière première', 'Dépendance à un seul fournisseur', 'Hausse du prix de l’aluminium', 'Retard de livraison des machines par le fournisseur étranger', 'Erreur de gestion des stocks'],
     q2: ['Un seul fournisseur qualifié', 'Délais de douane', 'Mauvaise prévision des besoins', 'Variation des prix fournisseurs'],
     q3: ['Arrêt de la ligne faute de matière', 'Surcoût d’achat', 'Pénalités de retard'],
-    q4: ['Part de marché face aux concurrents', 'La réputation auprès des constructeurs'],
+    q4: ['Qualifier un second fournisseur d’aluminium', 'Stock de sécurité de matière première', 'Suivi hebdomadaire du fournisseur de machines'],
   },
   maint: {
     q1: ['Pannes des nouvelles machines', 'Retard d’installation des machines', 'Manque de pièces de rechange', 'Maintenance préventive insuffisante', 'Mauvais réglage des équipements'],
     q2: ['Techniciens pas formés sur les nouvelles machines', 'Pas de plan de maintenance préventive', 'Usure des machines existantes à 85 %'],
     q3: ['Arrêt de production', 'Défauts de fabrication', 'Prolongation des pannes'],
-    q4: ['Le contrat et l’image de l’entreprise'],
+    q4: ['Plan de maintenance préventive dès l’installation', 'Commander les pièces de rechange avec les machines', 'Former les techniciens chez le fabricant'],
   },
   qual: {
     q1: ['Pièces non conformes au démarrage', 'Échec de l’audit du constructeur', 'Taux de défaut au-dessus de 50 ppm', 'Absence de procédures de contrôle'],
     q2: ['Mauvais réglage des machines', 'Contrôle qualité insuffisant', 'Opérateurs inexpérimentés', 'Mauvaise interprétation du cahier des charges'],
     q3: ['Rebuts et retouches', 'Réclamations client', 'Livraison de pièces défectueuses'],
-    q4: ['La certification et la confiance du client', 'Les futures commandes'],
+    q4: ['Contrôle à 100 % pendant le premier mois', 'Audit blanc avant l’audit client', 'Fiches de réglage validées'],
   },
   rh: {
     q1: ['Difficulté à recruter 30 opérateurs', 'Formation insuffisante des opérateurs', 'Turnover élevé', 'Absentéisme', 'Accidents du travail des nouveaux'],
     q2: ['Pénurie de main d’oeuvre qualifiée à Kénitra', 'Temps de formation limité', 'Conditions de travail en équipes'],
     q3: ['Erreurs de manipulation', 'Retard du démarrage', 'Perte de compétences'],
-    q4: ['L’image de l’entreprise comme employeur', 'Le contrat avec le constructeur'],
+    q4: ['Partenariat avec l’OFPPT pour le recrutement', 'Formation des opérateurs sur les nouvelles machines', 'Prime d’assiduité pendant le lancement'],
   },
 };
 
@@ -201,6 +207,12 @@ export const BOT_NAMES = [
   'Sara', 'Anas', 'Hiba', 'Zakaria', 'Rim', 'Adam', 'Douae', 'Yassine', 'Malak', 'Reda',
   'Chaimae', 'Amine', 'Ghita', 'Soufiane', 'Lina', 'Bilal', 'Aya', 'Walid',
 ];
+
+// Arguments des participants fictifs quand leur note s'écarte du groupe
+export const BOT_ARGS = {
+  up: ['Le délai de 3 mois ne laisse aucune marge', 'Nous avons déjà vécu ce problème sur l’ancienne ligne', 'Une seule défaillance bloque toute la production', 'Le constructeur ne tolérera aucun retard'],
+  down: ['Un plan de secours existe déjà dans notre service', 'Le fournisseur a toujours tenu ses délais', 'Ce risque est rare dans notre usine', 'Les procédures actuelles couvrent déjà ce cas'],
+};
 
 export const BOT_MEASURES = {
   machines: 'Suivi hebdomadaire du fournisseur et pénalités contractuelles',
