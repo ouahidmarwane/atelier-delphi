@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS, QUIZ, QUIZ_DURATION, QUIZ_COLORS, quizShape, quizPoints } from './content.js?v=202611221558';
-import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221558';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221558';
-import { uid, aiGroup } from './store.js?v=202611221558';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221558';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS, QUIZ, QUIZ_DURATION, QUIZ_COLORS, quizShape, quizPoints } from './content.js?v=202611221732';
+import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221732';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221732';
+import { uid, aiGroup } from './store.js?v=202611221732';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221732';
 
 const app = document.getElementById('app');
 let store;
@@ -314,14 +314,24 @@ const slug = (s) => normalize(s).trim().replace(/ /g, '-').slice(0, 40);
 // Même format que l'analyse par mots-clés, mais avec les groupes de l'IA
 function aiOpen(qkey, rows, ppl) {
   const groups = ai.groups[qkey] || [];
-  const where = new Map();
-  groups.forEach((g, gi) => g.refs.forEach((r) => where.set(r, gi)));
   const measures = qkey === 'q4';
-  const themes = groups.map((g, gi) => ({
-    id: measures ? 'm-' + slug(g.label) + '-' + gi : g.theme || 'ai-' + slug(g.label) || 'ai-' + gi,
-    label: g.theme && !measures ? themeById[g.theme].label : g.label,
-    count: 0, people: new Set(), depts: new Set(), samples: [], ai: !g.theme && !measures, off: offTopic(g.label),
-  }));
+  // Plusieurs groupes de l'IA peuvent désigner le même risque : on les fusionne en une seule ligne
+  const themes = [];
+  const byId = new Map();
+  const where = new Map();
+  groups.forEach((g, gi) => {
+    const label = g.theme && !measures ? themeById[g.theme].label : g.label;
+    const id = measures ? 'm-' + slug(g.label) : g.theme || 'ai-' + slug(label) || 'ai-' + gi;
+    const key = measures ? id : normalize(label);
+    let ti = byId.get(id) ?? byId.get(key);
+    if (ti == null) {
+      ti = themes.length;
+      themes.push({ id, label, count: 0, people: new Set(), depts: new Set(), samples: [], ai: !g.theme && !measures, off: offTopic(g.label) });
+    }
+    byId.set(id, ti);
+    byId.set(key, ti);
+    g.refs.forEach((r) => where.set(r, ti));
+  });
   const other = [];
   let lines = 0;
   const respondents = new Set();
@@ -1325,7 +1335,16 @@ const actions = {
   startRound2: () => {
     const c = ensureConsolidation();
     const all = [...c.list.map((t) => ({ id: t.id, label: t.label })), ...c.custom];
-    const risks = all.filter((r) => c.selected.has(r.id));
+    // Un risque n'entre qu'une fois dans la notation, même s'il a deux origines (IA, mots-clés, ajout manuel)
+    const seen = new Set();
+    const risks = all.filter((r) => {
+      if (!c.selected.has(r.id)) return false;
+      const k = normalize(r.label);
+      if (seen.has(r.id) || seen.has(k)) return false;
+      seen.add(r.id);
+      seen.add(k);
+      return true;
+    });
     if (!risks.length) return;
     startQuestion(2, 0, { risks, roundRisks: { 2: risks.map((r) => r.id) }, feedback: {} });
   },

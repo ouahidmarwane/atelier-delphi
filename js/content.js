@@ -11,6 +11,7 @@ export const SCENARIO = {
     { figure: '30', unit: 'opérateurs', text: 'à recruter et à former' },
     { figure: '1', unit: 'fournisseur', text: 'de matière première qualifié, et un seul' },
     { figure: '85 %', unit: 'de capacité', text: 'déjà utilisés dans l’usine actuelle' },
+    { figure: '< 50', unit: 'pièces défectueuses', text: 'par million exigées, audit client avant démarrage' },
   ],
   // Frise de 12 semaines affichée sous le scénario
   timeline: [

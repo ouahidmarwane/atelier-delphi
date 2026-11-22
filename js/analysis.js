@@ -1,5 +1,5 @@
 // Analyse des réponses en temps réel : thèmes, doublons, statistiques et constats.
-import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221558';
+import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221732';
 
 export function normalize(text) {
   return ' ' + String(text || '')
@@ -122,7 +122,9 @@ export function stats(values) {
     const hi = Math.ceil(pos);
     return v[lo] + (v[hi] - v[lo]) * (pos - lo);
   };
-  const median = q(0.5);
+  // Les échelles vont de 1 à 5 en nombres entiers : une médiane tombant entre deux notes est arrondie
+  // à la note supérieure, par prudence (3,5 devient 4). P, G et la criticité restent donc des entiers.
+  const median = Math.round(q(0.5));
   const within = v.filter((x) => Math.abs(x - median) <= 1).length / n;
   return { n, median, q1: q(0.25), q3: q(0.75), iqr: q(0.75) - q(0.25), within, dist };
 }
