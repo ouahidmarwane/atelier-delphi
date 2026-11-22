@@ -1,5 +1,5 @@
 // Analyse des réponses en temps réel : thèmes, doublons, statistiques et constats.
-import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221505';
+import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221518';
 
 export function normalize(text) {
   return ' ' + String(text || '')

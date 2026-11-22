@@ -1,6 +1,6 @@
 // Petits outils d'affichage partagés : icônes, QR code, minuterie, échappement.
-import qrcode from '../vendor/qrcode.mjs?v=202611221505';
-import { deptById } from './content.js?v=202611221505';
+import qrcode from '../vendor/qrcode.mjs?v=202611221518';
+import { deptById } from './content.js?v=202611221518';
 
 const ICONS = {
   'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
@@ -10,6 +10,7 @@ const ICONS = {
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
   play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  smartphone: '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   'user-plus': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',

@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221505';
-import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221505';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221505';
-import { uid, aiGroup } from './store.js?v=202611221505';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221505';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221518';
+import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221518';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221518';
+import { uid, aiGroup } from './store.js?v=202611221518';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221518';
 
 const app = document.getElementById('app');
 let store;
@@ -58,6 +58,7 @@ function renderLanding(error) {
         <label class="check"><input type="checkbox" name="rehearsal" ${store.mode === 'local' ? 'checked' : ''}><span>Autoriser les participants fictifs pour répéter</span></label>
         <div class="row">
           <button class="btn primary lg" type="submit">Créer la session ${icon('arrow-right')}</button>
+          <button class="btn lg" type="button" data-act="simulate">Lancer une simulation ${icon('play')}</button>
           ${saved ? `<button class="btn lg" type="button" data-act="resume">Reprendre la session ${esc(saved)}</button>` : ''}
         </div>
       </form>
@@ -469,6 +470,7 @@ function topbar() {
     <div class="brand"><span class="mark" aria-hidden="true"></span><span class="name">${esc(SCENARIO.company)}</span><span class="sub">Atelier Delphi</span></div>
     <ol class="ruler" aria-label="Étapes de la méthode">${steps}</ol>
     <div class="session">
+      ${state.settings?.simulation ? `<span class="sim-tag">Simulation</span><button class="btn sim-phone-btn" data-act="togglePhone">${icon('smartphone')}Vue étudiant</button>` : ''}
       <span class="conn" data-conn title="Connexion"></span>
       <span class="meta">${icon('users')}<b class="num" data-count>${participants.size}</b></span>
       <span class="meta code">Code <b>${esc(code)}</b></span>
@@ -1218,7 +1220,22 @@ const actions = {
     location.hash = '#/host/' + localStorage.getItem(SAVED);
   },
   fullscreen: toggleFullscreen,
-  toLobby: () => setState({ phase: 'lobby' }),
+  toLobby: () => {
+    setState({ phase: 'lobby' });
+    if (state.settings?.simulation) trickleBots();
+  },
+  simulate: async () => {
+    const settings = { duration: 40, rating: 25, rehearsal: true, simulation: true };
+    const c = newCode();
+    const initial = { phase: 'scenario', round: 0, qIndex: 0, timer: null, risks: [], roundRisks: {}, feedback: {}, resultIndex: 0, settings, sentAt: Date.now() };
+    try {
+      await store.createSession(c, initial);
+      location.hash = '#/host/' + c;
+    } catch (err) {
+      renderLanding('Impossible de créer la simulation : ' + (err.message || err));
+    }
+  },
+  togglePhone: () => togglePhone(),
   zoomQr: () => openQrZoom(),
   takeOver: () => {
     passive = false;
@@ -1364,6 +1381,7 @@ function tick() {
   }
   if (state.phase === 'interlude' && d) d.querySelector('[data-label]').textContent = 'secondes';
   const token = `${state.phase}-${state.round}-${state.qIndex}`;
+  if (state.settings?.simulation && !passive) simulationShortcut(left, token);
   if (!passive && left <= 0 && t.pausedLeft == null && firedFor !== token) {
     firedFor = token;
     if (state.phase === 'question') nextQuestion();
@@ -1470,7 +1488,7 @@ function scheduleBots() {
   const prevAgreement = state.round >= 3 ? analyzeRatings(answersOf(state.round - 1), [{ id: q.key, label: q.title }])[0].agreement : null;
   for (const p of bots) {
     if (answers.has(`${p.id}|${state.round}|${q.key}`)) continue;
-    if (Math.random() < 0.06) continue;
+    if (!state.settings?.simulation && Math.random() < 0.06) continue;
     const delay = 1200 + Math.random() * spreadMs;
     const round = state.round;
     const stubborn = round >= 3 && (prevAgreement ?? 1) < 0.72 && Math.random() < (round === 3 ? 0.6 : 0.05);
@@ -1509,3 +1527,50 @@ function botPayload(p, round, q, stubborn = false) {
 }
 
 export { deptById };
+
+
+// ---------- Simulation (temporaire, pour vérifier le déroulement sans téléphones) ----------
+
+let trickling = false;
+// Les étudiants fictifs arrivent un par un dans la salle d'attente, comme en vrai
+async function trickleBots() {
+  if (trickling) return;
+  trickling = true;
+  const taken = new Set([...participants.values()].map((p) => p.name));
+  const names = shuffle(BOT_NAMES.filter((n) => !taken.has(n)));
+  for (let k = 0; k < 20 && state.phase === 'lobby'; k++) {
+    const p = { id: uid(), name: names[k] || `Étudiant ${k + 1}`, dept: DEPARTMENTS[k % DEPARTMENTS.length].id, bot: true };
+    participants.set(p.id, { ...p, joined_at: new Date().toISOString() });
+    queueRender();
+    store.joinMany(code, [p]).catch(() => {});
+    await new Promise((r) => setTimeout(r, 350 + Math.random() * 650));
+  }
+  trickling = false;
+}
+
+// Quand tout le monde a répondu, le compte à rebours passe à 3 secondes pour ne pas attendre
+let shortened = null;
+function simulationShortcut(left, token) {
+  if (state.phase !== 'question' || shortened === token || left <= 4 || state.timer.pausedLeft != null) return;
+  const q = questionsFor(state.round)[state.qIndex];
+  if (!q || !participants.size) return;
+  const done = [...participants.keys()].filter((id) => answers.has(`${id}|${state.round}|${q.key}`)).length;
+  if (done < participants.size) return;
+  shortened = token;
+  setState({ timer: { ...state.timer, endsAt: Date.now() + 3000 } });
+}
+
+// Un téléphone simulé à côté du tableau : c'est la vraie page étudiant, on peut y répondre soi-même
+function togglePhone() {
+  let el = document.querySelector('.sim-phone');
+  if (el) {
+    el.remove();
+    return;
+  }
+  el = document.createElement('aside');
+  el.className = 'sim-phone';
+  el.innerHTML = `<div class="sim-phone-bar"><span>Vue étudiant</span><button class="icon-btn" data-close aria-label="Fermer">${icon('x')}</button></div>
+    <iframe title="Téléphone simulé" src="${location.pathname}${location.search}#/join/${code}"></iframe>`;
+  el.querySelector('[data-close]').addEventListener('click', () => el.remove());
+  document.body.appendChild(el);
+}
