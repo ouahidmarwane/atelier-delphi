@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221405';
-import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221405';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221405';
-import { uid, aiGroup } from './store.js?v=202611221405';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221405';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221412';
+import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221412';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221412';
+import { uid, aiGroup } from './store.js?v=202611221412';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221412';
 
 const app = document.getElementById('app');
 let store;
@@ -302,6 +302,42 @@ function finalResults() {
     const measures = [...round1Measures(risk.id), ...rated.filter((r) => r >= 3).flatMap((r) => analyzeRatings(answersOf(r), [risk])[0].measures)];
     return { ...res, lastRound: last, rounds: rated.length, top: topMeasures(measures, 2) };
   }).filter((r) => r.n).sort(byPriority);
+}
+
+// Stabilité : les notes bougent-elles encore d'un tour à l'autre ?
+function stabilityOf(round, x, prevX) {
+  if (!prevX?.n) return null;
+  const cur = answersOf(round).filter((a) => a.qkey === x.id);
+  const before = new Map(answersOf(round - 1).filter((a) => a.qkey === x.id).map((a) => [a.participant_id, a.payload]));
+  let pairs = 0;
+  let changed = 0;
+  for (const a of cur) {
+    const b = before.get(a.participant_id);
+    if (!b) continue;
+    pairs++;
+    if (b.p !== a.payload.p || b.i !== a.payload.i) changed++;
+  }
+  const rate = pairs ? changed / pairs : 0;
+  const medDelta = Math.abs(x.p.median - prevX.p.median) + Math.abs(x.i.median - prevX.i.median);
+  return { rate, medDelta, stable: pairs > 0 && rate <= RULES.stableChange && medDelta <= 0.5 };
+}
+
+// Positions opposées d'un risque sans consensus : le camp des avis bas et celui des avis hauts
+function positionsOf(x) {
+  const rows = answersOf(x.lastRound).filter((a) => a.qkey === x.id && a.payload);
+  const mid = x.p.median + x.i.median;
+  const sum = (a) => a.payload.p + a.payload.i;
+  let low = rows.filter((a) => sum(a) <= mid - 1);
+  let high = rows.filter((a) => sum(a) >= mid + 1);
+  if (!low.length) low = rows.filter((a) => sum(a) < mid);
+  if (!high.length) high = rows.filter((a) => sum(a) > mid);
+  const camp = (list) => {
+    if (!list.length) return null;
+    const why = list.map((a) => a.payload.why).find(Boolean)
+      || list.map((a) => answers.get(`${a.participant_id}|${x.lastRound - 1}|${x.id}`)?.payload?.why).find(Boolean);
+    return { n: list.length, p: stats(list.map((a) => a.payload.p)).median, i: stats(list.map((a) => a.payload.i)).median, why };
+  };
+  return { low: camp(low), high: camp(high) };
 }
 
 // Arguments anonymes renvoyés au groupe : d'abord ceux des avis les plus éloignés de la médiane
@@ -908,6 +944,7 @@ function convergence(results, prev) {
         <span class="pt after ${x.consensus ? 'ok' : ''}" style="left:${b * 100}%;--from:${(a ?? b) * 100}%;--to:${b * 100}%"></span>
       </span>
       <span class="conv-val num">${a != null ? `${pct(a)} → ` : ''}<b>${pct(b)}</b></span>
+      ${stabTag(stabilityOf(state.round, x, p))}
       <span class="tag ${x.consensus ? 'ok' : 'warn'}">${x.consensus ? 'Consensus' : 'À revoir'}</span>
     </li>`;
   }).join('');
@@ -916,12 +953,34 @@ function convergence(results, prev) {
     <div class="conv-legend muted small"><span><i class="pt-key before"></i>Tour ${state.round - 1}</span><span><i class="pt-key after"></i>Tour ${state.round}</span><span><i class="th-key"></i>Seuil de consensus ${pct(RULES.consensusShare)}</span></div>`;
 }
 
-function decisionPanel(results) {
+function stabTag(s) {
+  if (!s) return '<span></span>';
+  return `<span class="stab ${s.stable ? 'on' : ''}" title="${pct(s.rate)} des participants ont changé leur note">${s.stable ? 'Stable' : 'Évolue'} <em class="num">${pct(s.rate)}</em></span>`;
+}
+
+// Où en est-on : consensus, réponses encore en mouvement, ou réponses stabilisées sans consensus
+function openStatus(round = state.round) {
+  const results = ratingResults(round);
+  const prev = analyzeRatings(answersOf(round - 1), risksOf(round));
   const open = results.filter((x) => x.n && !x.consensus);
+  const moving = open.filter((x) => !stabilityOf(round, x, prev.find((y) => y.id === x.id))?.stable);
+  return { open, moving, stable: open.length - moving.length };
+}
+
+function decisionPanel(results) {
+  const { open, moving } = openStatus();
   if (!open.length) {
     return `<div class="panel decision ok"><h3>Consensus atteint</h3><p>Tous les risques font consensus. La consultation peut s’arrêter et produire la liste hiérarchisée.</p></div>`;
   }
-  return `<div class="panel decision"><h3>Pas encore de consensus</h3><p>${open.length} risque${open.length > 1 ? 's restent' : ' reste'} en dessous du seuil. Selon la méthode, on relance un tour sur ${open.length > 1 ? 'ces risques' : 'ce risque'}, ou on s’arrête si les réponses se sont stabilisées.</p></div>`;
+  if (!moving.length) {
+    return `<div class="panel decision stable"><h3>Réponses stabilisées</h3><p>${open.length} risque${open.length > 1 ? 's restent' : ' reste'} sans consensus, mais les notes ne bougent presque plus : un nouveau tour n’apporterait rien. Selon la méthode, on clôt la consultation. Ces risques seront évalués avec le <b>principe de prudence</b>, et leurs positions opposées seront présentées dans la liste finale.</p></div>`;
+  }
+  return `<div class="panel decision"><h3>Pas encore de consensus</h3><p>${open.length} risque${open.length > 1 ? 's restent' : ' reste'} en dessous du seuil, dont ${moving.length} dont les notes évoluent encore. Selon la méthode, on relance un tour sur ${moving.length > 1 ? 'ces risques' : 'ce risque'}. Au-delà de 4 tours, la fatigue des participants compte : on peut aussi clore.</p></div>`;
+}
+
+function positionsHtml(pos) {
+  const camp = (c, cls, label) => (c ? `<span class="pos ${cls}"><b>${label}</b> <span class="num">P ${fmt(c.p)} · G ${fmt(c.i)}</span> <span class="muted">(${c.n} avis)</span>${c.why ? `<q>${esc(c.why)}</q>` : ''}</span>` : '');
+  return `<span class="positions">${camp(pos.high, 'up', 'Avis hauts')}${camp(pos.low, 'down', 'Avis bas')}</span>`;
 }
 
 // Évaluation : comparer chaque niveau aux critères et décider
@@ -945,8 +1004,8 @@ function evaluateStage() {
     const auto = autoDecision(x);
     return `<li class="eval-row" style="--i:${i}">
       <span class="num muted">${i + 1}</span>
-      <span class="eval-label">${esc(x.label)}${d.id !== auto.id ? '<span class="changed">modifié</span>' : ''}</span>
-      <span class="lvl ${x.level?.id}">${fmt(x.crit)}</span>
+      <span class="eval-label">${esc(x.label)}${isPrudent(x) ? `<span class="prudent" title="Sans consensus : évalué avec l’avis haut (3e quartile)">prudence · P ${Math.ceil(x.p.q3)} · G ${Math.ceil(x.i.q3)}</span>` : ''}${d.id !== auto.id ? '<span class="changed">modifié</span>' : ''}</span>
+      <span class="lvl ${decisionOf(x).id}">${fmt(x.crit)}</span>
       <span class="decide">${EVAL_CRITERIA.map((c) => `<button class="${c.id} ${c.id === d.id ? 'on' : ''}" data-act="decide" data-id="${esc(x.id)}" data-d="${c.id}" aria-pressed="${c.id === d.id}">${c.label} · ${c.action}</button>`).join('')}</span>
     </li>`;
   }).join('');
@@ -989,11 +1048,11 @@ function finalStage() {
           <thead><tr><th>#</th><th>Risque</th><th class="r">P</th><th class="r">G</th><th class="r">Criticité</th><th>Décision</th><th>Mesures de maîtrise proposées</th></tr></thead>
           <tbody>${res.map((x, i) => `<tr style="--i:${i}" data-rank="${i}">
             <td class="num muted">${i + 1}</td>
-            <td><span class="rname">${esc(x.label)}</span><span class="muted small">${x.consensus ? 'Consensus' : 'Sans consensus'} · tour ${x.lastRound}</span></td>
+            <td><span class="rname">${esc(x.label)}</span><span class="muted small">${x.consensus ? 'Consensus' : 'Sans consensus'} · tour ${x.lastRound}</span>${x.consensus ? '' : positionsHtml(positionsOf(x))}</td>
             <td class="r num">${fmt(x.p.median)}</td>
             <td class="r num">${fmt(x.i.median)}</td>
-            <td class="r"><span class="lvl ${x.level?.id}">${fmt(x.crit)}</span></td>
-            <td><span class="dec ${decisionOf(x).id}">${decisionOf(x).label} · ${decisionOf(x).action}</span></td>
+            <td class="r"><span class="lvl ${decisionOf(x).id}">${fmt(x.crit)}</span></td>
+            <td><span class="dec ${decisionOf(x).id}">${decisionOf(x).label} · ${decisionOf(x).action}</span>${isPrudent(x) ? '<span class="prudent block">principe de prudence</span>' : ''}</td>
             <td>${x.top.length ? `<ul class="measures">${x.top.map((m) => `<li>${esc(m.text)}${m.count > 1 ? ` <span class="muted num">×${m.count}</span>` : ''}</li>`).join('')}</ul>` : '<span class="muted">Aucune proposition</span>'}</td>
           </tr>`).join('')}</tbody>
         </table>
@@ -1035,10 +1094,14 @@ function controls() {
       if (state.round === 1) right = nav + (ai?.status === 'pending' ? '' : b('rerunAi', 'Relancer l’IA', 'ghost', 'rotate')) + b('toConsolidate', 'Consolider la liste', 'primary', 'arrow-right');
       else if (state.round === 2) right = nav + b('toEvaluate', 'Clore et évaluer', 'ghost') + b('nextRound', 'Lancer le tour 3 · Convergence', 'primary', 'arrow-right');
       else {
-        const open = ratingResults(state.round).filter((x) => x.n && !x.consensus).length;
-        right = nav + (open
-          ? b('toEvaluate', 'Clore et évaluer', 'ghost') + b('nextRound', `Tour ${state.round + 1} sur ${open} risque${open > 1 ? 's' : ''}`, 'primary', 'arrow-right')
-          : b('toEvaluate', 'Passer à l’évaluation', 'primary', 'arrow-right'));
+        const st = openStatus();
+        const n = st.moving.length;
+        const closeFirst = st.open.length && (!n || state.round >= 4);
+        right = nav + (!st.open.length
+          ? b('toEvaluate', 'Passer à l’évaluation', 'primary', 'arrow-right')
+          : closeFirst
+            ? (n ? b('nextRound', `Tour ${state.round + 1} sur ${n} risque${n > 1 ? 's' : ''}`, 'ghost') : '') + b('toEvaluate', 'Clore et évaluer', 'primary', 'arrow-right')
+            : b('toEvaluate', 'Clore et évaluer', 'ghost') + b('nextRound', `Tour ${state.round + 1} sur ${n} risque${n > 1 ? 's' : ''}`, 'primary', 'arrow-right'));
       }
       break;
     }
@@ -1112,7 +1175,7 @@ const actions = {
   nextRound: () => {
     const r = state.round;
     const results = ratingResults(r);
-    const ids = r === 2 ? results.map((x) => x.id) : results.filter((x) => x.n && !x.consensus).map((x) => x.id);
+    const ids = r === 2 ? results.map((x) => x.id) : openStatus(r).moving.map((x) => x.id);
     const fb = Object.fromEntries(results.map((x) => [x.id, { p: x.p.median, i: x.i.median, n: x.n, args: argsFor(r, x) }]));
     startQuestion(r + 1, 0, {
       roundRisks: { ...state.roundRisks, [r + 1]: ids },
@@ -1212,8 +1275,8 @@ function tick() {
 
 function exportCsv() {
   const res = finalResults().sort((a, b) => Number(decisionOf(a).id.slice(1)) - Number(decisionOf(b).id.slice(1)) || b.crit - a.crit);
-  const head = ['Rang', 'Risque', 'Probabilité médiane', 'Gravité médiane', 'Criticité', 'Priorité', 'Décision', 'Accord', 'Consensus', 'Dernier tour', 'Mesures proposées'];
-  const rows = res.map((x, i) => [i + 1, x.label, fmt(x.p.median), fmt(x.i.median), fmt(x.crit), decisionOf(x).label, decisionOf(x).action, pct(x.agreement), x.consensus ? 'Oui' : 'Non', x.lastRound, x.top.map((m) => m.text).join(' | ')]);
+  const head = ['Rang', 'Risque', 'Probabilité médiane', 'Gravité médiane', 'Criticité', 'Priorité', 'Décision', 'Prudence', 'Accord', 'Consensus', 'Dernier tour', 'Mesures proposées'];
+  const rows = res.map((x, i) => [i + 1, x.label, fmt(x.p.median), fmt(x.i.median), fmt(x.crit), decisionOf(x).label, decisionOf(x).action, isPrudent(x) ? 'Oui (3e quartile)' : '', pct(x.agreement), x.consensus ? 'Oui' : 'Non', x.lastRound, x.top.map((m) => m.text).join(' | ')]);
   const csv = [head, ...rows].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');

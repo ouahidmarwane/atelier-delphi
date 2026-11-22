@@ -362,3 +362,19 @@ body { background: var(--bg); }
 /* Règle des étapes : chaque étape prend la place de son intitulé */
 .ruler li { flex: 1 1 auto; }
 @media (max-width: 1500px) { .topbar .brand .sub { display: none; } .ruler li { font-size: 0.76rem; padding-right: 0.3rem; } }
+
+/* Stabilité, prudence et positions opposées */
+.conv-row { grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) 7rem 6rem 6rem; }
+.stab { font-size: 0.78rem; font-weight: 500; color: var(--text-3); white-space: nowrap; }
+.stab em { font-style: normal; margin-left: 0.25rem; opacity: 0.8; }
+.stab.on { color: #4b3fa3; }
+.decision.stable { background: rgba(124, 92, 196, 0.1); }
+.decision.stable h3 { color: #4b3fa3; }
+.prudent { display: inline-block; margin-left: 0.5rem; font-size: 0.74rem; font-weight: 500; padding: 0.05rem 0.45rem; border-radius: 0.3rem; background: rgba(124, 92, 196, 0.12); color: #4b3fa3; vertical-align: middle; white-space: nowrap; }
+.prudent.block { display: block; width: max-content; margin: 0.3rem 0 0; }
+.positions { display: grid; gap: 0.3rem; margin-top: 0.45rem; }
+.pos { display: block; font-size: 0.84rem; padding: 0.3rem 0.55rem; border-radius: 0.4rem; color: var(--text-2); }
+.pos b { font-weight: 500; }
+.pos.up { background: rgba(214, 69, 69, 0.07); } .pos.up b { color: #b3261e; }
+.pos.down { background: rgba(46, 154, 118, 0.08); } .pos.down b { color: #2e7d4f; }
+.pos q { display: block; margin-top: 0.1rem; color: var(--text); quotes: '« ' ' »'; }

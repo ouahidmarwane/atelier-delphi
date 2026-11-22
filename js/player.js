@@ -1,9 +1,9 @@
 // Écran téléphone : l'étudiant rejoint, puis répond à chaque question du tour en cours.
-import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName } from './content.js?v=202611221405';
-import { fmt } from './analysis.js?v=202611221405';
-import { icon, esc, mmss } from './ui.js?v=202611221405';
-import { uid } from './store.js?v=202611221405';
-import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221405';
+import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName } from './content.js?v=202611221412';
+import { fmt } from './analysis.js?v=202611221412';
+import { icon, esc, mmss } from './ui.js?v=202611221412';
+import { uid } from './store.js?v=202611221412';
+import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221412';
 
 const app = document.getElementById('app');
 let store;

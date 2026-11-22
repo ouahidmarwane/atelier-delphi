@@ -89,6 +89,8 @@ export const RULES = {
   ratingDuration: 90,
   interlude: 10,
   maxRisks: 8,
+  // Réponses stabilisées : au plus 20 % des participants changent leur note et la médiane bouge d'un demi-point au plus
+  stableChange: 0.2,
 };
 
 // Grille de notation du cours : la priorité dépend de la case probabilité × gravité
@@ -107,7 +109,10 @@ export const EVAL_CRITERIA = [
   { id: 'p3', label: 'Priorité 3', action: 'À surveiller', zone: 'Gravité 1 ou 2 avec probabilité 1 ou 2', text: 'On garde les moyens de maîtrise existants' },
 ];
 export const decisionById = Object.fromEntries(EVAL_CRITERIA.map((c) => [c.id, c]));
+// Principe de prudence : sans consensus, on évalue avec l'avis haut (3e quartile) plutôt qu'avec la médiane
+export const isPrudent = (x) => !!(x && x.n && x.consensus === false);
 export function autoDecision(x) {
+  if (isPrudent(x)) return decisionById[priorityOf(Math.ceil(x.p.q3), Math.ceil(x.i.q3))];
   return decisionById[priorityOf(x?.p?.median, x?.i?.median)];
 }
 
