@@ -42,6 +42,7 @@ export const STEPS = [
   { id: 'a3', label: 'Consensus' },
   { id: 'eval', label: 'Évaluation' },
   { id: 'end', label: 'Résultat' },
+  { id: 'quiz', label: 'Quiz' },
 ];
 
 export const ROUND1_QUESTIONS = [
@@ -242,3 +243,30 @@ export const BOT_MEASURES = {
   planification: 'Réunion de pilotage hebdomadaire',
   client: 'Point d’avancement mensuel avec le constructeur',
 };
+
+// ---------- Quiz de fin, basé sur la présentation ----------
+// c : index de la bonne réponse. Les couleurs et formes suivent l'ordre des choix.
+export const QUIZ_DURATION = 20;
+export const QUIZ = [
+  { id: 'z1', q: 'Selon l’ISO 31000, quelles étapes forment l’appréciation du risque ?', a: ['Identification, analyse, évaluation', 'Identification, traitement, suivi', 'Analyse, traitement, communication', 'Évaluation, contrôle, audit'], c: 0 },
+  { id: 'z2', q: 'Dans le cours, Delphi est d’abord classée comme une technique…', a: ['de traitement des risques', 'd’identification des risques', 'de communication de crise', 'de surveillance'], c: 1 },
+  { id: 'z3', q: 'Qui a développé la méthode Delphi dans les années 1950 ?', a: ['L’ISO', 'La NASA', 'La RAND Corporation', 'Toyota'], c: 2 },
+  { id: 'z4', q: 'Lequel de ces éléments n’est PAS un principe de Delphi ?', a: ['Anonymat', 'Itération', 'Retour contrôlé', 'Débat en face à face'], c: 3 },
+  { id: 'z5', q: 'Pourquoi les réponses restent-elles anonymes ?', a: ['Pour réduire l’influence des personnalités dominantes', 'Pour aller plus vite', 'Pour ne pas avoir à justifier', 'Pour se passer du coordinateur'], c: 0 },
+  { id: 'z6', q: 'Le « retour contrôlé », c’est…', a: ['Le coordinateur corrige les réponses', 'Une synthèse anonyme communiquée entre les tours', 'Un débat oral entre experts', 'Un vote à main levée'], c: 1 },
+  { id: 'z7', q: 'Quand arrête-t-on les tours ?', a: ['Après exactement deux tours', 'Quand le coordinateur est d’accord', 'Au consensus ou à la stabilisation des réponses', 'Quand tout le monde donne la même note'], c: 2 },
+  { id: 'z8', q: 'Delphi est surtout utile quand…', a: ['Les données historiques manquent', 'Les statistiques sont complètes', 'Un seul expert est disponible', 'La décision est déjà prise'], c: 0 },
+  { id: 'z9', q: 'Vrai ou faux : la convergence des avis prouve que la réponse est vraie.', a: ['Vrai', 'Faux'], c: 1 },
+  { id: 'z10', q: 'Sur notre matrice, un risque de Gravité 4 est classé en…', a: ['Priorité 3', 'Priorité 2', 'Priorité 1', 'Hors matrice'], c: 2 },
+];
+export const QUIZ_COLORS = ['#e0453a', '#2f6fd6', '#d9a21b', '#3d9a4a'];
+export const QUIZ_SHAPES = [
+  '<path d="M12 3 22 20H2z"/>',
+  '<path d="M12 2 22 12 12 22 2 12z"/>',
+  '<circle cx="12" cy="12" r="10"/>',
+  '<rect x="3" y="3" width="18" height="18" rx="1"/>',
+];
+export const quizShape = (i) => `<svg viewBox="0 0 24 24" aria-hidden="true" class="qshape"><g fill="currentColor">${QUIZ_SHAPES[i]}</g></svg>`;
+// Points façon Kahoot : 1000 au maximum, la moitié perdue linéairement sur la durée
+export const quizPoints = (correct, ms, duration = QUIZ_DURATION) =>
+  correct ? Math.round(1000 * (1 - Math.min(1, Math.max(0, ms) / (duration * 1000)) / 2)) : 0;

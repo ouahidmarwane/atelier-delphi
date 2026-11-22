@@ -1,9 +1,9 @@
 // Écran téléphone : l'étudiant rejoint, puis répond à chaque question du tour en cours.
-import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName } from './content.js?v=202611221518';
-import { fmt } from './analysis.js?v=202611221518';
-import { icon, esc, mmss } from './ui.js?v=202611221518';
-import { uid } from './store.js?v=202611221518';
-import { ambient, ripples, spotlight, vibrate, keepAwake } from './fx.js?v=202611221518';
+import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName, QUIZ, QUIZ_COLORS, quizShape } from './content.js?v=202611221558';
+import { fmt } from './analysis.js?v=202611221558';
+import { icon, esc, mmss } from './ui.js?v=202611221558';
+import { uid } from './store.js?v=202611221558';
+import { ambient, ripples, spotlight, vibrate, keepAwake } from './fx.js?v=202611221558';
 
 const app = document.getElementById('app');
 let store;
@@ -125,6 +125,7 @@ function currentQuestion() {
 function keyOf() {
   if (!me) return 'join';
   if (!state) return 'none';
+  if (state.phase === 'quiz') return `quiz|${state.quiz?.index}|${state.quiz?.stage}|${mine.has('100|' + state.quiz?.key) ? 1 : 0}`;
   return `${state.phase}|${state.round}|${state.qIndex}`;
 }
 
@@ -136,6 +137,7 @@ function render(force) {
   }
   screenKey = k;
   if (!me) return renderJoin();
+  if (state?.phase === 'quiz') return renderQuiz();
   const q = currentQuestion();
   if (q) return renderQuestion(q);
   renderWaiting();
@@ -355,6 +357,7 @@ function showError(el, msg) {
 }
 
 function tick() {
+  if (state?.phase === 'quiz') return quizTickPhone();
   if (!state || state.phase !== 'question' || !state.timer) return;
   const left = timeLeft();
   const t = app.querySelector('[data-timer]');
@@ -369,4 +372,81 @@ function tick() {
     btn.disabled = true;
     btn.textContent = 'Temps écoulé';
   }
+}
+
+
+// ---------- Quiz, façon Kahoot ----------
+
+function renderQuiz() {
+  const zs = state.quiz;
+  const z = QUIZ[zs.index];
+  const head = pHeader(meChip());
+  const res = zs.res?.[me.id];
+  const place = res ? `<p class="qp-rank">${res[0]}<sup>${res[0] === 1 ? 'er' : 'e'}</sup> · <span class="num">${res[1]}</span> points</p>` : '';
+  let body = '';
+  if (zs.stage === 'intro') {
+    body = `<div class="qp-full qp-wait"><p class="eyebrow">Quiz · ${QUIZ.length} questions</p><h1>Prêt ?</h1><p>Regardez la question au tableau, puis touchez la bonne couleur. Plus vous êtes rapide, plus vous gagnez de points.</p></div>`;
+  } else if (zs.stage === 'question') {
+    const done = mine.get('100|' + z.id);
+    if (done) {
+      body = `<div class="qp-full qp-wait"><span class="qp-picked" style="--qc:${QUIZ_COLORS[done.c]}">${quizShape(done.c)}</span><h1>Réponse envoyée</h1><p>Attendez les autres joueurs…</p></div>`;
+    } else {
+      body = `<p class="qp-count">Question ${zs.index + 1} sur ${QUIZ.length}</p>
+        <div class="qp-timebar"><span data-qpbar></span></div>
+        <div class="qp-grid n${z.a.length}">${z.a.map((t, k) => `
+          <button class="qp-btn" style="--qc:${QUIZ_COLORS[k]}" data-c="${k}">${quizShape(k)}<span>${esc(t)}</span></button>`).join('')}</div>
+        <p class="status" data-qstatus></p>`;
+    }
+  } else if (zs.stage === 'reveal' || zs.stage === 'board') {
+    const st = res ? res[3] : -1;
+    const cls = st === 1 ? 'ok' : st === 0 ? 'ko' : 'none';
+    const title = st === 1 ? 'Bonne réponse' : st === 0 ? 'Mauvaise réponse' : 'Pas de réponse';
+    body = `<div class="qp-full qp-result ${cls}">
+      <span class="qp-mark">${icon(st === 1 ? 'check' : 'x')}</span>
+      <h1>${title}</h1>
+      ${st === 1 ? `<p class="qp-gain num">+${res[2]}</p>` : `<p>La bonne réponse : <b>${esc(z.a[z.c])}</b></p>`}
+      ${place}
+    </div>`;
+  } else {
+    const medal = res && res[0] <= 3;
+    body = `<div class="qp-full qp-result ${medal ? 'ok' : 'none'}">
+      <p class="eyebrow">Quiz terminé</p>
+      <h1>${res ? `Vous terminez ${res[0]}<sup>${res[0] === 1 ? 'er' : 'e'}</sup>` : 'Merci d’avoir joué'}</h1>
+      ${res ? `<p class="qp-gain num">${res[1]} points</p>` : ''}
+      <p>Merci pour votre participation.</p>
+    </div>`;
+  }
+  app.innerHTML = `<main class="p-wrap quiz-phone">${head}${body}</main>`;
+  app.querySelectorAll('.qp-btn').forEach((btn) => btn.addEventListener('click', () => sendQuiz(z, Number(btn.dataset.c))));
+  quizTickPhone();
+}
+
+async function sendQuiz(z, c) {
+  if (sending) return;
+  sending = true;
+  vibrate(30);
+  app.querySelectorAll('.qp-btn').forEach((b) => { b.disabled = true; b.classList.toggle('on', Number(b.dataset.c) === c); });
+  try {
+    await store.submitAnswer(code, { participant_id: me.id, round: 100, qkey: z.id, payload: { c } }, me.secret);
+    mine.set('100|' + z.id, { c });
+    render(true);
+  } catch (err) {
+    const msg = String(err.message || err);
+    if (/fermée|écoulé/.test(msg)) {
+      const s = app.querySelector('[data-qstatus]');
+      if (s) { s.className = 'status err'; s.textContent = 'Trop tard, le temps est écoulé'; }
+    } else {
+      app.querySelectorAll('.qp-btn').forEach((b) => { b.disabled = false; b.classList.remove('on'); });
+      const s = app.querySelector('[data-qstatus]');
+      if (s) { s.className = 'status err'; s.textContent = 'Envoi impossible, touchez à nouveau'; }
+    }
+  }
+  sending = false;
+}
+
+function quizTickPhone() {
+  const bar = app.querySelector('[data-qpbar]');
+  if (!bar || !state.timer) return;
+  const left = timeLeft();
+  bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / state.timer.duration))})`;
 }

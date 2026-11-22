@@ -1,5 +1,5 @@
 // Couche de données : même interface pour Supabase (vraie séance) et pour le mode répétition local.
-import { CONFIG } from './config.js?v=202611221518';
+import { CONFIG } from './config.js?v=202611221558';
 
 const answerKey = (r) => `${r.participant_id}|${r.round}|${r.qkey}`;
 
@@ -33,7 +33,7 @@ const randomKey = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (
 
 // Toutes les écritures passent par des fonctions sécurisées : clé animateur ou secret du téléphone
 async function supabaseStore() {
-  const { createClient } = await import('../vendor/supabase.mjs?v=202611221518');
+  const { createClient } = await import('../vendor/supabase.mjs?v=202611221558');
   const sb = createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
     realtime: { params: { eventsPerSecond: 20 } },
   });
@@ -137,6 +137,12 @@ function localStore() {
     async setState(code, state) {
       const db = read(code);
       if (!db) return;
+      // Même règle que le serveur : heure d'ouverture de la question du quiz
+      if (state.phase === 'quiz' && state.quiz?.stage === 'question') {
+        const old = db.state;
+        const same = old.phase === 'quiz' && old.quiz?.stage === 'question' && old.quiz?.key === state.quiz.key && old.quiz?.opened;
+        state = { ...state, quiz: { ...state.quiz, opened: same ? old.quiz.opened : Date.now() } };
+      }
       db.state = state;
       write(code, db);
       emit(code, 'state', { code, state });
@@ -160,6 +166,15 @@ function localStore() {
       return db ? Object.values(db.participants).sort((a, b) => a.joined_at.localeCompare(b.joined_at)) : [];
     },
     async submitAnswer(code, row) {
+      const db = read(code);
+      const st = db?.state;
+      if (st?.phase === 'quiz') {
+        if (st.quiz?.stage !== 'question' || st.quiz.key !== row.qkey) throw new Error('question fermée');
+        const ms = Date.now() - (st.quiz.opened || Date.now());
+        if (ms > (st.quiz.duration || 20) * 1000 + 1500) throw new Error('temps écoulé');
+        if (db.answers[answerKey({ ...row, round: 100 })]) return;
+        return this.hostAnswers(code, [{ ...row, round: 100, payload: { c: row.payload.c, ms } }]);
+      }
       return this.hostAnswers(code, [row]);
     },
     async hostAnswers(code, rows) {

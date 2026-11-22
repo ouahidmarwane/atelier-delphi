@@ -398,3 +398,93 @@ body { background: var(--bg); }
 .sim-phone-bar { display: flex; align-items: center; justify-content: space-between; padding: 2px 8px 8px 12px; color: #d9d9d4; font-size: 0.8rem; }
 .sim-phone-bar .icon-btn { color: #d9d9d4; }
 .sim-phone iframe { flex: 1; width: 100%; border: 0; border-radius: 20px; background: #fff; }
+
+/* ---------- Quiz façon Kahoot : quatre couleurs et quatre formes, sur le thème graphite ---------- */
+.qshape { width: 1.6em; height: 1.6em; flex: none; }
+.quiz { display: flex; flex-direction: column; gap: 20px; min-height: 100%; }
+.quiz-q { font-size: clamp(1.8rem, 3vw, 2.8rem); line-height: 1.15; font-weight: 500; letter-spacing: -0.02em; text-align: center; max-width: 1100px; margin: 0 auto; }
+.quiz .eyebrow { text-align: center; }
+.quiz-mid { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 28px; max-width: 1100px; width: 100%; margin: 8px auto; }
+.quiz-timer { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; background: var(--text); color: #fff; font-size: 2.4rem; }
+.quiz-timer .low { color: #ffb4a8; animation: heartbeat 1s ease-in-out infinite; }
+.quiz-bar { height: 10px; border-radius: 10px; background: var(--raised); overflow: hidden; }
+.quiz-bar span { display: block; height: 100%; background: var(--text); transform-origin: left; transition: transform 0.2s linear; }
+.quiz-count { display: flex; flex-direction: column; align-items: center; min-width: 96px; color: var(--text-2); font-size: 0.9rem; }
+.quiz-count b { font-size: 2.4rem; color: var(--text); font-weight: 500; }
+.qtiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 1300px; width: 100%; margin: auto auto 0; }
+.qtile { position: relative; display: flex; align-items: center; gap: 18px; min-height: 104px; padding: 18px 24px; border-radius: 12px; background: var(--qc); color: #fff; font-size: clamp(1.1rem, 1.6vw, 1.5rem); font-weight: 500; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.18); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); }
+.qtile .qshape { width: 40px; height: 40px; }
+.qtile.wrong { opacity: 0.28; }
+.qtile.right { transform: scale(1.02); }
+.qt-text { flex: 1; }
+.qt-count { font-size: 1.6rem; }
+.qt-check { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff; color: var(--qc); }
+.qt-check svg { width: 24px; height: 24px; stroke-width: 3; }
+.qbars { display: flex; justify-content: center; align-items: flex-end; gap: 28px; height: 220px; }
+.qbar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; width: 110px; height: 100%; }
+.qb-n { display: flex; align-items: center; gap: 6px; font-size: 1.6rem; color: var(--text); }
+.qb-n svg { width: 22px; height: 22px; stroke-width: 3; color: var(--ok); }
+.qb-bar { width: 100%; height: var(--h); background: var(--qc); border-radius: 8px 8px 0 0; animation: grow 0.7s var(--ease) both; transform-origin: bottom; }
+.qbar-col:not(.right) .qb-bar { opacity: 0.35; }
+.qb-shape { color: var(--qc); }
+@keyframes grow { from { transform: scaleY(0); } }
+.quiz-intro { align-items: center; justify-content: center; text-align: center; gap: 16px; }
+.quiz-intro h1 { font-size: clamp(2.2rem, 4vw, 3.6rem); font-weight: 500; letter-spacing: -0.02em; }
+.quiz-legend { display: flex; gap: 14px; margin: 12px 0; }
+.quiz-legend span { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 12px; background: var(--qc); color: #fff; animation: pop 0.5s var(--ease) both; }
+.quiz-legend span:nth-child(2) { animation-delay: 80ms; } .quiz-legend span:nth-child(3) { animation-delay: 160ms; } .quiz-legend span:nth-child(4) { animation-delay: 240ms; }
+.quiz-legend .qshape { width: 36px; height: 36px; }
+@keyframes pop { from { transform: scale(0.4); opacity: 0; } }
+.quiz-board h1, .quiz-podium h1 { text-align: center; font-size: 2.4rem; font-weight: 500; }
+.board { list-style: none; display: flex; flex-direction: column; gap: 10px; width: min(900px, 100%); margin: 0 auto; padding: 0; }
+.board li { position: relative; display: grid; grid-template-columns: 48px 1fr auto auto; align-items: center; gap: 16px; padding: 16px 22px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); overflow: hidden; font-size: 1.3rem; animation: slidein 0.6s var(--ease) both; animation-delay: var(--d); }
+.board li:first-child { background: var(--text); color: #fff; }
+.b-rank { color: var(--text-3); } .board li:first-child .b-rank { color: #f2cf3a; }
+.b-gain { font-size: 0.95rem; color: var(--ok); } .board li:first-child .b-gain { color: #9fe0ad; }
+.b-score { font-weight: 500; }
+@keyframes slidein { from { transform: translateY(16px); opacity: 0; } }
+@keyframes widen { from { width: 0; } }
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 18px; height: 420px; margin-top: auto; }
+.pod { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 220px; }
+.pod-name { font-size: 1.5rem; font-weight: 500; animation: pop 0.5s var(--ease) both; }
+.pod-score { color: var(--text-2); }
+.pod-block { width: 100%; display: grid; place-items: start center; padding-top: 18px; border-radius: 12px 12px 0 0; background: var(--text); color: #fff; font-size: 3rem; animation: rise 0.9s var(--ease) both; transform-origin: bottom; }
+.pod.p1 .pod-block { height: 260px; background: #c99a12; animation-delay: 0.9s; } .pod.p1 .pod-name, .pod.p1 .pod-score { animation-delay: 1.5s; }
+.pod.p2 .pod-block { height: 190px; background: #8a8a86; animation-delay: 0.45s; } .pod.p2 .pod-name, .pod.p2 .pod-score { animation-delay: 1s; }
+.pod.p3 .pod-block { height: 140px; background: #a8673a; } .pod.p3 .pod-name { animation-delay: 0.5s; }
+.pod-score { animation: pop 0.5s var(--ease) both; }
+@keyframes rise { from { transform: scaleY(0); } }
+
+/* Téléphone */
+.quiz-phone { display: flex; flex-direction: column; min-height: 100svh; }
+.qp-count { text-align: center; color: var(--text-2); margin: 4px 0 8px; }
+.qp-timebar { height: 6px; border-radius: 6px; background: var(--raised); overflow: hidden; margin-bottom: 12px; }
+.qp-timebar span { display: block; height: 100%; background: var(--text); transform-origin: left; transition: transform 0.25s linear; }
+.qp-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 10px; min-height: 60svh; }
+.qp-grid.n2 { grid-template-columns: 1fr; }
+.qp-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; border: 0; border-radius: 12px; background: var(--qc); color: #fff; font: inherit; font-size: 0.95rem; font-weight: 500; line-height: 1.25; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.18); cursor: pointer; transition: transform 0.15s var(--ease), opacity 0.2s; -webkit-tap-highlight-color: transparent; }
+.qp-btn .qshape { width: 48px; height: 48px; }
+.qp-btn:active { transform: scale(0.96); }
+.qp-btn:disabled:not(.on) { opacity: 0.3; }
+.qp-full { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; border-radius: 16px; }
+.qp-full h1 { font-size: 1.8rem; font-weight: 500; }
+.qp-picked { display: grid; place-items: center; width: 96px; height: 96px; border-radius: 16px; background: var(--qc); color: #fff; animation: pop 0.4s var(--ease) both; }
+.qp-picked .qshape { width: 52px; height: 52px; }
+.qp-result.ok { background: #2f8a3e; color: #fff; }
+.qp-result.ko { background: #c7362c; color: #fff; }
+.qp-result.none { background: var(--raised); }
+.qp-mark { display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); animation: pop 0.45s var(--ease) both; }
+.qp-result.none .qp-mark { background: var(--card); }
+.qp-mark svg { width: 44px; height: 44px; stroke-width: 3; }
+.qp-gain { font-size: 2.2rem; font-weight: 500; }
+.qp-rank { margin-top: 8px; padding: 8px 16px; border-radius: 999px; background: rgba(0, 0, 0, 0.18); }
+.qp-result.none .qp-rank { background: var(--card); }
+
+html, body { overflow-x: clip; }
+.ambient { overflow: hidden; }
+.quiz > .muted { text-align: center; }
+/* La règle des étapes rétrécit au lieu de pousser le haut de l'écran hors du cadre */
+.topbar { grid-template-columns: auto minmax(0, 1fr) auto; gap: 2rem; }
+.ruler li { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ruler li.now { flex: none; overflow: visible; }
+@media (max-width: 1700px) { .topbar .brand .sub { display: none; } .session { gap: 0.8rem; } }

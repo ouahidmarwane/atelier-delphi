@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221518';
-import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221518';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221518';
-import { uid, aiGroup } from './store.js?v=202611221518';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221518';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS, QUIZ, QUIZ_DURATION, QUIZ_COLORS, quizShape, quizPoints } from './content.js?v=202611221558';
+import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221558';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221558';
+import { uid, aiGroup } from './store.js?v=202611221558';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221558';
 
 const app = document.getElementById('app');
 let store;
@@ -58,6 +58,7 @@ function renderLanding(error) {
         <label class="check"><input type="checkbox" name="rehearsal" ${store.mode === 'local' ? 'checked' : ''}><span>Autoriser les participants fictifs pour répéter</span></label>
         <div class="row">
           <button class="btn primary lg" type="submit">Créer la session ${icon('arrow-right')}</button>
+          <button class="btn lg" type="button" data-act="quizOnly">Quiz seul</button>
           <button class="btn lg" type="button" data-act="simulate">Lancer une simulation ${icon('play')}</button>
           ${saved ? `<button class="btn lg" type="button" data-act="resume">Reprendre la session ${esc(saved)}</button>` : ''}
         </div>
@@ -453,6 +454,7 @@ function round1Measures(riskId) {
 function stepIndex() {
   const { phase, round } = state;
   if (phase === 'scenario' || phase === 'lobby') return 0;
+  if (phase === 'quiz') return 9;
   if (phase === 'final') return 8;
   if (phase === 'evaluate') return 7;
   if (phase === 'consolidate') return 2;
@@ -470,7 +472,7 @@ function topbar() {
     <div class="brand"><span class="mark" aria-hidden="true"></span><span class="name">${esc(SCENARIO.company)}</span><span class="sub">Atelier Delphi</span></div>
     <ol class="ruler" aria-label="Étapes de la méthode">${steps}</ol>
     <div class="session">
-      ${state.settings?.simulation ? `<span class="sim-tag">Simulation</span><button class="btn sim-phone-btn" data-act="togglePhone">${icon('smartphone')}Vue étudiant</button>` : ''}
+      ${state.settings?.simulation ? `<span class="sim-tag">Simulation</span><button class="icon-btn sim-phone-btn" data-act="togglePhone" title="Vue étudiant">${icon('smartphone')}</button>` : ''}
       <span class="conn" data-conn title="Connexion"></span>
       <span class="meta">${icon('users')}<b class="num" data-count>${participants.size}</b></span>
       <span class="meta code">Code <b>${esc(code)}</b></span>
@@ -494,7 +496,10 @@ function afterRender() {
   linkHover(app);
   const key = `${state.phase}-${state.round}`;
   if (celebrated === key) return;
-  if (state.phase === 'final') {
+  if (state.phase === 'quiz' && state.quiz?.stage === 'podium') {
+    celebrated = key;
+    setTimeout(() => confetti(220), 1600);
+  } else if (state.phase === 'final') {
     celebrated = key;
     setTimeout(() => confetti(180), 350);
   } else if (state.phase === 'results' && app.querySelector('.decision.ok')) {
@@ -509,6 +514,15 @@ function renderLive() {
   if (count && count.textContent !== String(participants.size)) {
     count.textContent = participants.size;
     bump(count);
+  }
+  if (state.phase === 'quiz') {
+    const qc = app.querySelector('[data-qcount]');
+    const n = String(quizAnswers(state.quiz?.key).length);
+    if (qc && qc.textContent !== n) {
+      qc.textContent = n;
+      bump(qc);
+    }
+    return;
   }
   if (state.phase === 'question') {
     const live = app.querySelector('[data-live]');
@@ -555,6 +569,7 @@ function stage() {
     case 'consolidate': return consolidateStage();
     case 'evaluate': return evaluateStage();
     case 'final': return finalStage();
+    case 'quiz': return quizStage();
     default: return '';
   }
 }
@@ -1169,7 +1184,7 @@ function controls() {
       right = b('toLobby', 'Afficher le QR code', 'primary', 'arrow-right');
       break;
     case 'lobby':
-      right = `${b('toScenario', 'Revoir le scénario', 'ghost')}${b('zoomQr', 'Agrandir le QR code', '', 'maximize')}${state.settings?.rehearsal ? b('addBots', 'Ajouter 20 participants fictifs', '', 'user-plus') : ''}${b('startRound1', 'Démarrer le tour 1 · Identification', 'primary', 'arrow-right')}`;
+      right = `${b('toScenario', 'Revoir le scénario', 'ghost')}${b('zoomQr', 'Agrandir le QR code', '', 'maximize')}${state.settings?.rehearsal ? b('addBots', 'Ajouter 20 participants fictifs', '', 'user-plus') : ''}${state.settings?.quizOnly ? b('startQuiz', 'Démarrer le quiz', 'primary', 'arrow-right') : `${state.settings?.simulation ? b('startQuiz', 'Tester le quiz', 'ghost') : ''}${b('startRound1', 'Démarrer le tour 1 · Identification', 'primary', 'arrow-right')}`}`;
       break;
     case 'question': {
       const qs = questionsFor(state.round);
@@ -1207,8 +1222,18 @@ function controls() {
       right = `${b('backRatings', 'Revoir les résultats', 'ghost')}${b('toFinal', 'Valider l’évaluation', 'primary', 'arrow-right')}`;
       break;
     case 'final':
-      right = `${b('backEvaluate', 'Revoir l’évaluation', 'ghost')}` + `${b('newSession', 'Nouvelle session', 'ghost', 'rotate')}${b('print', 'Imprimer', '', 'printer')}${b('csv', 'Exporter en CSV', 'primary', 'download')}`;
+      right = `${b('backEvaluate', 'Revoir l’évaluation', 'ghost')}` + `${b('newSession', 'Nouvelle session', 'ghost', 'rotate')}${b('print', 'Imprimer', '', 'printer')}${b('csv', 'Exporter en CSV', '', 'download')}${b('startQuiz', 'Lancer le quiz', 'primary', 'arrow-right')}`;
       break;
+    case 'quiz': {
+      const z = state.quiz;
+      const last = z.index >= QUIZ.length - 1;
+      if (z.stage === 'intro') right = b('quizNext', 'Commencer le quiz', 'primary', 'arrow-right');
+      else if (z.stage === 'question') right = b('quizNext', 'Afficher la réponse', 'primary', 'skip');
+      else if (z.stage === 'reveal') right = b('quizNext', 'Classement', 'primary', 'arrow-right');
+      else if (z.stage === 'board') right = b('quizNext', last ? 'Voir le podium' : 'Question suivante', 'primary', 'arrow-right');
+      else right = `${state.settings?.quizOnly ? '' : b('backFinal', 'Revenir au résultat Delphi', 'ghost')}${b('newSession', 'Nouvelle session', '', 'rotate')}`;
+      break;
+    }
   }
   return `<footer class="controls">${hints}<div class="actions">${right}</div></footer>`;
 }
@@ -1236,6 +1261,25 @@ const actions = {
     }
   },
   togglePhone: () => togglePhone(),
+  startQuiz: () => {
+    clearBots();
+    setState({ phase: 'quiz', round: 100, qIndex: 0, timer: null, quizFrom: { phase: state.phase, round: state.round }, quiz: { index: 0, key: QUIZ[0].id, stage: 'intro', duration: QUIZ_DURATION } });
+  },
+  quizNext: () => quizNext(),
+  backFinal: () => {
+    clearBots();
+    setState({ phase: state.quizFrom?.phase || 'final', round: state.quizFrom?.round ?? 3, timer: null });
+  },
+  quizOnly: async () => {
+    const settings = { duration: 180, rating: 90, rehearsal: false, quizOnly: true };
+    const c = newCode();
+    try {
+      await store.createSession(c, { phase: 'lobby', round: 0, qIndex: 0, timer: null, risks: [], roundRisks: {}, feedback: {}, resultIndex: 0, settings, sentAt: Date.now() });
+      location.hash = '#/host/' + c;
+    } catch (err) {
+      renderLanding('Impossible de créer le quiz : ' + (err.message || err));
+    }
+  },
   zoomQr: () => openQrZoom(),
   takeOver: () => {
     passive = false;
@@ -1363,6 +1407,7 @@ function togglePause() {
 }
 
 function tick() {
+  if (state?.phase === 'quiz') return quizTick();
   if (!state || !state.timer || (state.phase !== 'question' && state.phase !== 'interlude')) return;
   const t = state.timer;
   const left = t.pausedLeft != null ? t.pausedLeft : (t.endsAt - Date.now()) / 1000;
@@ -1446,6 +1491,7 @@ function bindGlobal() {
     else if (e.key === 'ArrowRight') {
       if (state.phase === 'results') actions.nextView();
       else if (state.phase === 'question' || state.phase === 'interlude') actions.next();
+      else if (state.phase === 'quiz' && state.quiz.stage !== 'podium') quizNext();
     } else if (e.key === 'ArrowLeft' && state.phase === 'results') actions.prevView();
   });
 }
@@ -1573,4 +1619,180 @@ function togglePhone() {
     <iframe title="Téléphone simulé" src="${location.pathname}${location.search}#/join/${code}"></iframe>`;
   el.querySelector('[data-close]').addEventListener('click', () => el.remove());
   document.body.appendChild(el);
+}
+
+
+// ---------- Quiz de fin, façon Kahoot ----------
+
+const quizAnswers = (key) => [...answers.values()].filter((a) => a.round === 100 && a.qkey === key && participants.has(a.participant_id));
+
+// Score cumulé jusqu'à la question `upto` incluse
+function quizScores(upto) {
+  const rows = new Map([...participants.values()].map((p) => [p.id, { p, total: 0, gained: 0, correct: null }]));
+  QUIZ.slice(0, upto + 1).forEach((z, i) => {
+    for (const a of quizAnswers(z.id)) {
+      const r = rows.get(a.participant_id);
+      if (!r) continue;
+      const pts = quizPoints(Number(a.payload?.c) === z.c, a.payload?.ms);
+      r.total += pts;
+      if (i === upto) {
+        r.gained = pts;
+        r.correct = pts > 0;
+      }
+    }
+  });
+  return [...rows.values()].sort((a, b) => b.total - a.total || a.p.name.localeCompare(b.p.name));
+}
+
+function quizOpen(i) {
+  const z = QUIZ[i];
+  firedFor = null;
+  setState({ qIndex: i, quiz: { index: i, key: z.id, stage: 'question', duration: QUIZ_DURATION }, timer: { endsAt: Date.now() + QUIZ_DURATION * 1000, duration: QUIZ_DURATION } });
+  scheduleQuizBots(z);
+}
+
+async function quizReveal() {
+  clearBots();
+  await refreshAll();
+  const z = state.quiz;
+  const ranks = quizScores(z.index);
+  // Résultat de chacun, lu par son téléphone : [rang, total, points gagnés, juste (1), faux (0) ou sans réponse (-1)]
+  const res = {};
+  ranks.forEach((r, k) => { res[r.p.id] = [k + 1, r.total, r.gained, r.correct === null ? -1 : r.correct ? 1 : 0]; });
+  setState({ timer: null, quiz: { ...z, stage: 'reveal', correct: QUIZ[z.index].c, res } });
+}
+
+function quizNext() {
+  const z = state.quiz;
+  if (z.stage === 'intro') return quizOpen(0);
+  if (z.stage === 'question') return quizReveal();
+  if (z.stage === 'reveal') return setState({ quiz: { ...z, stage: 'board' } });
+  if (z.stage === 'board') {
+    if (z.index >= QUIZ.length - 1) return setState({ quiz: { ...z, stage: 'podium' } });
+    return quizOpen(z.index + 1);
+  }
+}
+
+let quizFired = null;
+function quizTick() {
+  const z = state.quiz;
+  if (!z || z.stage !== 'question' || !state.timer || passive) return;
+  const left = (state.timer.endsAt - Date.now()) / 1000;
+  const el = app.querySelector('[data-qtime]');
+  const v = String(Math.max(0, Math.ceil(left)));
+  if (el && el.textContent !== v) {
+    el.textContent = v;
+    el.classList.toggle('low', left <= 5);
+  }
+  const bar = app.querySelector('[data-qbar]');
+  if (bar) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / z.duration))})`;
+  // Fin du temps, ou tout le monde a répondu : on révèle la réponse
+  const all = participants.size > 0 && quizAnswers(z.key).length >= participants.size;
+  if ((left <= 0 || all) && quizFired !== z.key) {
+    quizFired = z.key;
+    setTimeout(quizReveal, all && left > 0 ? 600 : 0);
+  }
+}
+
+function scheduleQuizBots(z) {
+  clearBots();
+  if (!state.settings?.rehearsal) return;
+  const bots = [...participants.values()].filter((p) => p.bot);
+  for (const p of bots) {
+    const ms = 1500 + Math.random() * 11000;
+    const right = Math.random() < 0.72;
+    const wrong = z.a.map((_, k) => k).filter((k) => k !== z.c);
+    const c = right ? z.c : pick(wrong);
+    botTimers.push(setTimeout(() => {
+      if (state.phase !== 'quiz' || state.quiz.key !== z.id || state.quiz.stage !== 'question') return;
+      const row = { participant_id: p.id, round: 100, qkey: z.id, payload: { c, ms: Math.round(ms) } };
+      answers.set(akey(row), row);
+      renderLive();
+      store.hostAnswers(code, [row]).catch(() => {});
+    }, ms));
+  }
+}
+
+function quizTiles(z, reveal) {
+  const counts = z.a.map((_, k) => quizAnswers(z.id).filter((a) => Number(a.payload?.c) === k).length);
+  return `<div class="qtiles n${z.a.length}">${z.a.map((t, k) => `
+    <div class="qtile ${reveal ? (k === z.c ? 'right' : 'wrong') : ''}" style="--qc:${QUIZ_COLORS[k]}">
+      ${quizShape(k)}<span class="qt-text">${esc(t)}</span>
+      ${reveal ? `<span class="qt-count num">${counts[k]}</span>${k === z.c ? `<span class="qt-check">${icon('check')}</span>` : ''}` : ''}
+    </div>`).join('')}</div>`;
+}
+
+function quizBars(z) {
+  const counts = z.a.map((_, k) => quizAnswers(z.id).filter((a) => Number(a.payload?.c) === k).length);
+  const max = Math.max(1, ...counts);
+  return `<div class="qbars">${counts.map((n, k) => `
+    <div class="qbar-col ${k === z.c ? 'right' : ''}" style="--qc:${QUIZ_COLORS[k]}">
+      <span class="qb-n num">${n}${k === z.c ? icon('check') : ''}</span>
+      <span class="qb-bar" style="--h:${Math.max(4, (n / max) * 100)}%"></span>
+      <span class="qb-shape">${quizShape(k)}</span>
+    </div>`).join('')}</div>`;
+}
+
+function quizStage() {
+  const zs = state.quiz;
+  const z = QUIZ[zs.index];
+  const head = `<p class="eyebrow">Quiz · Question ${zs.index + 1} sur ${QUIZ.length}</p>`;
+  if (zs.stage === 'intro') {
+    return `<section class="quiz quiz-intro enter">
+      <p class="eyebrow">Quiz · ${QUIZ.length} questions</p>
+      <h1>Avez-vous bien suivi la présentation ?</h1>
+      <p class="lead">Répondez sur votre téléphone. Plus vous répondez vite, plus vous gagnez de points.</p>
+      <div class="quiz-legend">${QUIZ_COLORS.map((c, k) => `<span style="--qc:${c}">${quizShape(k)}</span>`).join('')}</div>
+      <p class="muted"><b class="num">${participants.size}</b> joueurs connectés</p>
+    </section>`;
+  }
+  if (zs.stage === 'question') {
+    return `<section class="quiz enter" data-q="quiz-${zs.index}">
+      ${head}
+      <h1 class="quiz-q">${esc(z.q)}</h1>
+      <div class="quiz-mid">
+        <div class="quiz-timer"><b class="num" data-qtime>${QUIZ_DURATION}</b></div>
+        <div class="quiz-bar"><span data-qbar></span></div>
+        <div class="quiz-count"><b class="num" data-qcount>${quizAnswers(z.id).length}</b><span>réponses</span></div>
+      </div>
+      ${quizTiles(z, false)}
+    </section>`;
+  }
+  if (zs.stage === 'reveal') {
+    return `<section class="quiz enter">
+      ${head}
+      <h1 class="quiz-q">${esc(z.q)}</h1>
+      ${quizBars(z)}
+      ${quizTiles(z, true)}
+    </section>`;
+  }
+  const ranks = quizScores(zs.index);
+  if (zs.stage === 'board') {
+    const top = ranks.slice(0, 5);
+    const max = Math.max(1, ...top.map((r) => r.total));
+    return `<section class="quiz quiz-board enter">
+      <p class="eyebrow">Classement · après la question ${zs.index + 1} sur ${QUIZ.length}</p>
+      <h1>Classement</h1>
+      <ol class="board">${top.map((r, k) => `
+        <li style="--d:${k * 90}ms;--w:${(r.total / max) * 100}%">
+          <span class="b-rank num">${k + 1}</span>
+          <span class="b-name">${esc(r.p.name)}</span>
+          ${r.gained ? `<span class="b-gain num">+${r.gained}</span>` : '<span class="b-gain"></span>'}
+          <span class="b-score num" data-countup>${r.total}</span>
+        </li>`).join('')}</ol>
+      ${ranks.length > 5 ? `<p class="muted">${ranks.length - 5} autres joueurs : chacun voit sa place sur son téléphone</p>` : ''}
+    </section>`;
+  }
+  // Podium
+  const [a, b, c] = ranks;
+  const step = (r, place, cls) => r ? `<div class="pod ${cls}">
+      <span class="pod-name">${esc(r.p.name)}</span>
+      <span class="pod-score num">${r.total} pts</span>
+      <div class="pod-block"><span class="num">${place}</span></div>
+    </div>` : `<div class="pod ${cls} empty"></div>`;
+  return `<section class="quiz quiz-podium enter">
+    <p class="eyebrow">Quiz terminé</p>
+    <h1>Podium</h1>
+    <div class="podium">${step(b, 2, 'p2')}${step(a, 1, 'p1')}${step(c, 3, 'p3')}</div>
+  </section>`;
 }

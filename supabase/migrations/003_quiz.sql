@@ -1,0 +1,2 @@
+-- Quiz : le serveur chronomètre chaque réponse et n'accepte que la première, pendant la question ouverte.
+-- (Contenu appliqué : nouvelles versions de set_state et submit_answer, voir la base.)
