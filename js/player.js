@@ -1,9 +1,9 @@
 // Écran téléphone : l'étudiant rejoint, puis répond à chaque question du tour en cours.
-import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName } from './content.js?v=202611221412';
-import { fmt } from './analysis.js?v=202611221412';
-import { icon, esc, mmss } from './ui.js?v=202611221412';
-import { uid } from './store.js?v=202611221412';
-import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221412';
+import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName } from './content.js?v=202611221445';
+import { fmt } from './analysis.js?v=202611221445';
+import { icon, esc, mmss } from './ui.js?v=202611221445';
+import { uid } from './store.js?v=202611221445';
+import { ambient, ripples, spotlight, vibrate, keepAwake } from './fx.js?v=202611221445';
 
 const app = document.getElementById('app');
 let store;
@@ -40,20 +40,48 @@ async function open(c) {
     me = null;
   }
   if (me) {
-    const list = await store.listParticipants(code);
-    if (!list.some((p) => p.id === me.id)) me = null;
+    const list = await store.listParticipants(code).catch(() => null);
+    if (!me.secret || (list && !list.some((p) => p.id === me.id))) me = null;
   }
+  // Le téléphone n'écoute que l'état de la séance : moins de trafic temps réel pour toute la classe
   store.subscribe(code, (kind, r) => {
-    if (kind === 'state' && r?.state) {
-      state = r.state;
-      // Décalage entre l'horloge de l'animateur et celle du téléphone, mesuré à chaque message
-      if (state.sentAt) clockOffset = state.sentAt - Date.now();
-      render();
-    }
-  });
+    if (kind === 'state' && r?.state) applyState(r.state);
+    if (kind === 'status' && r === 'SUBSCRIBED') resync();
+  }, ['sessions']);
   if (me) await loadMine();
   render(true);
   setInterval(tick, 250);
+  // Filet de sécurité : relecture de l'état si un message temps réel s'est perdu (veille, Wi-Fi, 4G)
+  setInterval(resync, 8000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { resync(); keepAwake(); }
+  });
+  window.addEventListener('online', resync);
+  document.addEventListener('pointerdown', keepAwake, { once: true });
+}
+
+let lastSent = 0;
+function applyState(next) {
+  if (!next) return;
+  // Ignore un état plus ancien que celui déjà affiché
+  if (next.sentAt && next.sentAt < lastSent) return;
+  lastSent = next.sentAt || lastSent;
+  const changed = JSON.stringify(next) !== JSON.stringify(state);
+  state = next;
+  // Décalage entre l'horloge de l'animateur et celle du téléphone, mesuré à chaque message
+  if (state.sentAt && changed) clockOffset = state.sentAt - Date.now();
+  if (changed) render();
+}
+
+let resyncing = false;
+async function resync() {
+  if (resyncing || !code) return;
+  resyncing = true;
+  try {
+    const row = await store.getSession(code);
+    if (row) applyState(row.state);
+  } catch {}
+  resyncing = false;
 }
 
 async function loadMine() {
@@ -136,13 +164,13 @@ function renderJoin(error) {
     const name = String(f.get('name') || '').trim();
     const dept = f.get('dept');
     if (!name || !dept) return;
-    const p = { id: uid(), name, dept };
+    const p = { id: uid(), name: name.slice(0, 24), dept };
     const btn = e.target.querySelector('button[type=submit]');
     btn.disabled = true;
     try {
-      await store.join(code, p);
-      me = p;
-      localStorage.setItem(meKey(code), JSON.stringify(p));
+      me = await store.join(code, p);
+      localStorage.setItem(meKey(code), JSON.stringify(me));
+      keepAwake();
       render(true);
     } catch (err) {
       btn.disabled = false;
@@ -301,7 +329,7 @@ function bindForm(q, key, draft) {
     const btn = form.querySelector('[data-send]');
     btn.disabled = true;
     try {
-      await store.upsertAnswers(code, [{ participant_id: me.id, round: state.round, qkey: q.key, payload }]);
+      await store.submitAnswer(code, { participant_id: me.id, round: state.round, qkey: q.key, payload }, me.secret);
       mine.set(key, payload);
       status.className = 'status ok';
       status.innerHTML = `${icon('check')} Réponse envoyée, vous pouvez encore la modifier`;

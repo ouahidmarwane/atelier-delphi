@@ -1,6 +1,6 @@
 // Petits outils d'affichage partagés : icônes, QR code, minuterie, échappement.
-import qrcode from '../vendor/qrcode.mjs?v=202611221412';
-import { deptById } from './content.js?v=202611221412';
+import qrcode from '../vendor/qrcode.mjs?v=202611221445';
+import { deptById } from './content.js?v=202611221445';
 
 const ICONS = {
   'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',

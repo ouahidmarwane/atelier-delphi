@@ -121,7 +121,18 @@ Deno.serve(async (req) => {
   try {
     const key = Deno.env.get("GEMINI_API_KEY");
     if (!key) return json({ error: "GEMINI_API_KEY manquante dans les secrets Supabase" }, 500);
-    const p = (await req.json()) as Payload & { debug?: boolean };
+    const p = (await req.json()) as Payload & { debug?: boolean; code?: string; host_key?: string };
+    // Seul l'animateur d'une session réelle peut appeler l'IA, avec un plafond d'appels par session
+    const ticket = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/rpc/ai_ticket`, {
+      method: "POST",
+      headers: {
+        apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY") ?? ""}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_code: String(p?.code ?? ""), p_key: String(p?.host_key ?? "") }),
+    }).then((r) => (r.ok ? r.json() : false)).catch(() => false);
+    if (ticket !== true) return json({ error: "accès refusé" }, 403);
     if (p?.debug) return json({ models: await models(key) });
     if ((p as any)?.probe) {
       const out: unknown[] = [];
@@ -140,6 +151,8 @@ Deno.serve(async (req) => {
       return json(out);
     }
     if (!p?.lines?.length) return json({ questions: [] });
+    p.themes = (p.themes ?? []).slice(0, 40).map((t) => ({ id: String(t.id).slice(0, 40), label: String(t.label).slice(0, 80) }));
+    p.questions = (p.questions ?? []).slice(0, 6).map((q) => ({ key: String(q.key).slice(0, 10), title: String(q.title).slice(0, 160) }));
     p.lines = p.lines.slice(0, 800).map((l) => ({ id: String(l.id), q: String(l.q), text: String(l.text).slice(0, 200) }));
     const valid = new Set(p.lines.map((l) => l.id));
     const qOf = Object.fromEntries(p.lines.map((l) => [l.id, l.q]));
@@ -157,7 +170,7 @@ Deno.serve(async (req) => {
       const byQ = new Map<string, { label: string; theme: string; ids: string[] }[]>();
       const groups = (out.questions || []).flatMap((q: any) => q.groups || []).concat(out.groups || []);
       for (const g of groups) {
-        const label = String(g.label || "").trim();
+        const label = String(g.label || "").trim().slice(0, 70);
         if (!label) continue;
         const parts = new Map<string, string[]>();
         for (const raw of g.ids || []) {

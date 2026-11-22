@@ -378,3 +378,14 @@ body { background: var(--bg); }
 .pos.up { background: rgba(214, 69, 69, 0.07); } .pos.up b { color: #b3261e; }
 .pos.down { background: rgba(46, 154, 118, 0.08); } .pos.down b { color: #2e7d4f; }
 .pos q { display: block; margin-top: 0.1rem; color: var(--text); quotes: '« ' ' »'; }
+
+/* Fenêtre en lecture seule quand une autre fenêtre pilote la séance */
+.passive { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 16px; background: #1f1f1f; color: #f4f4f2; font-size: 0.9rem; }
+.passive .btn { padding: 4px 12px; min-height: 0; }
+.is-passive .controls button:not([data-act="fullscreen"]) { opacity: 0.4; pointer-events: none; }
+
+/* Téléphones : pas de flou animé ni de lumière qui suit le doigt, pour garder la batterie et la fluidité */
+@media (max-width: 720px), (pointer: coarse) {
+  .ambient, .ambient * { animation: none !important; filter: none !important; opacity: 0.35; }
+  .p-card, .p-card::before { animation: none !important; }
+}

@@ -148,3 +148,13 @@ export function spotlight() {
 export function vibrate(ms = 30) {
   navigator.vibrate?.(ms);
 }
+
+// Empêche l'écran de se mettre en veille pendant la séance (ignoré si le navigateur ne le permet pas)
+let wakeLock = null;
+export async function keepAwake() {
+  try {
+    if (!('wakeLock' in navigator) || document.hidden) return;
+    if (wakeLock && !wakeLock.released) return;
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch {}
+}

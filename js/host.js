@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221412';
-import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221412';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221412';
-import { uid, aiGroup } from './store.js?v=202611221412';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221412';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221445';
+import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221445';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221445';
+import { uid, aiGroup } from './store.js?v=202611221445';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221445';
 
 const app = document.getElementById('app');
 let store;
@@ -99,25 +99,69 @@ async function openSession(c) {
     renderLanding(`La session ${c} est introuvable`);
     return false;
   }
+  if (!store.hasHostKey(c)) {
+    renderLanding(`La session ${c} est pilotée depuis un autre ordinateur : la clé d’animateur n’est pas sur cet appareil. Pour la reprendre, ouvrez-la sur l’ordinateur qui l’a créée.`);
+    return false;
+  }
   code = c;
   state = row.state;
   localStorage.setItem(SAVED, c);
-  const [ps, as] = await Promise.all([store.listParticipants(code), store.listAnswers(code)]);
-  ps.forEach((p) => participants.set(p.id, p));
-  as.forEach((a) => answers.set(akey(a), a));
+  await refreshAll();
   loadAi();
   store.subscribe(code, onEvent);
-  render();
+  // Verrou : cette fenêtre devient la seule à piloter la séance
+  setState({ hostId: INSTANCE });
   setInterval(tick, 200);
+  // Filet de sécurité si un message temps réel s'est perdu
+  setInterval(() => {
+    if (['lobby', 'question', 'interlude'].includes(state.phase)) refreshAll().then(queueRender);
+  }, 15000);
+  const resync = () => refreshAll().then(queueRender);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { resync(); keepAwake(); } });
+  window.addEventListener('online', () => { resync(); flushState(); });
+  keepAwake();
   if (state.phase === 'question') scheduleBots();
   return true;
 }
 
+const INSTANCE = Math.random().toString(36).slice(2, 10);
+let passive = false;
+
+async function refreshAll() {
+  try {
+    const [ps, as] = await Promise.all([store.listParticipants(code), store.listAnswers(code)]);
+    ps.forEach((p) => participants.set(p.id, p));
+    as.forEach((a) => answers.set(akey(a), a));
+  } catch (err) {
+    console.warn('Resynchronisation impossible', err);
+  }
+}
+
+function passiveBanner() {
+  if (!passive) return '';
+  return `<div class="passive">Une autre fenêtre pilote maintenant cette séance. Cette fenêtre est en lecture seule.<button class="btn" data-act="takeOver">Reprendre le pilotage ici</button></div>`;
+}
+
+let wasDown = false;
 function onEvent(kind, row) {
   if (kind === 'participant' && row?.id) participants.set(row.id, row);
   else if (kind === 'answer' && row?.participant_id) answers.set(akey(row), row);
-  else if (kind === 'status') { connection = row; updateConnection(); return; }
-  else return;
+  else if (kind === 'state' && row?.state) {
+    // Une autre fenêtre a pris le pilotage : celle-ci passe en lecture seule et suit l'état
+    if (row.state.hostId && row.state.hostId !== INSTANCE) {
+      passive = true;
+      clearBots();
+      state = row.state;
+      render();
+    }
+    return;
+  } else if (kind === 'status') {
+    connection = row;
+    updateConnection();
+    if (row === 'SUBSCRIBED' && wasDown) refreshAll().then(queueRender);
+    if (row !== 'SUBSCRIBED') wasDown = true;
+    return;
+  } else return;
   queueRender();
 }
 
@@ -129,14 +173,44 @@ function queueRender() {
   }, 200);
 }
 
+// Écriture de l'état : la dernière version est renvoyée jusqu'à ce que le serveur l'accepte
+let pushing = false;
+let dirty = false;
 async function setState(patch) {
+  if (passive) return;
   state = { ...state, ...patch, sentAt: Date.now() };
   render();
-  try {
-    await store.setState(code, state);
-  } catch (err) {
-    toast('Échec de la synchronisation : ' + (err.message || err));
+  dirty = true;
+  flushState();
+}
+
+async function flushState() {
+  if (pushing || !dirty || passive) return;
+  pushing = true;
+  let wait = 800;
+  while (dirty && !passive) {
+    dirty = false;
+    try {
+      await store.setState(code, { ...state, sentAt: Date.now() });
+      setSync(true);
+    } catch (err) {
+      dirty = true;
+      setSync(false, err.message || String(err));
+      if (/clé animateur/.test(err.message || '')) break;
+      await new Promise((r) => setTimeout(r, wait));
+      wait = Math.min(wait * 2, 5000);
+    }
   }
+  pushing = false;
+}
+
+let syncOk = true;
+function setSync(ok, msg) {
+  if (ok === syncOk) return;
+  syncOk = ok;
+  if (!ok) toast('Connexion perdue, nouvel essai en cours… ' + (msg ? `(${msg})` : ''), 6000);
+  else toast('Connexion rétablie');
+  updateConnection();
 }
 
 // ---------- Données dérivées ----------
@@ -202,7 +276,8 @@ async function runAi() {
   ai = { status: 'pending', started: Date.now() };
   refreshAiViews();
   try {
-    const out = await aiGroup({
+    await refreshAll();
+    const out = await aiGroup(code, {
       questions: ROUND1_QUESTIONS.map((q) => ({ key: q.key, title: q.title })),
       themes: THEMES.map((t) => ({ id: t.id, label: t.label })),
       lines,
@@ -405,7 +480,7 @@ function topbar() {
 function render() {
   if (!state) return;
   if (state.phase !== 'lobby') closeQrZoom();
-  app.innerHTML = `<div class="shell phase-${state.phase}">${topbar()}<main class="stage">${stage()}</main>${controls()}</div>`;
+  app.innerHTML = `<div class="shell phase-${state.phase} ${passive ? 'is-passive' : ''}">${passiveBanner()}${topbar()}<main class="stage">${stage()}</main>${controls()}</div>`;
   updateConnection();
   tick();
   afterRender();
@@ -463,7 +538,7 @@ function renderLive() {
 function updateConnection() {
   const el = app.querySelector('[data-conn]');
   if (!el) return;
-  const ok = connection === 'SUBSCRIBED';
+  const ok = connection === 'SUBSCRIBED' && syncOk;
   el.className = 'conn ' + (ok ? 'ok' : 'ko');
   el.title = ok ? (store.mode === 'local' ? 'Mode répétition local' : 'Temps réel connecté') : 'Connexion en cours';
 }
@@ -757,7 +832,23 @@ function ensureConsolidation() {
     selected: new Set(list.slice(0, RULES.maxRisks).map((t) => t.id)),
     custom: [],
   };
+  // Choix de l'animateur conservés si la page est rechargée pendant la consolidation
+  try {
+    const saved = JSON.parse(localStorage.getItem('delphi-consol:' + code));
+    if (saved?.touched) {
+      consolidation.custom = saved.custom || [];
+      consolidation.selected = new Set(saved.selected || []);
+      consolidation.touched = true;
+    }
+  } catch {}
   return consolidation;
+}
+
+function saveConsolidation() {
+  if (!consolidation) return;
+  try {
+    localStorage.setItem('delphi-consol:' + code, JSON.stringify({ touched: true, selected: [...consolidation.selected], custom: consolidation.custom }));
+  } catch {}
 }
 
 function consolidateStage() {
@@ -1129,6 +1220,10 @@ const actions = {
   fullscreen: toggleFullscreen,
   toLobby: () => setState({ phase: 'lobby' }),
   zoomQr: () => openQrZoom(),
+  takeOver: () => {
+    passive = false;
+    setState({ hostId: INSTANCE });
+  },
   toScenario: () => setState({ phase: 'scenario' }),
   addBots,
   startRound1: () => startQuestion(1, 0),
@@ -1162,6 +1257,7 @@ const actions = {
     if (c.selected.has(id)) c.selected.delete(id);
     else if (c.selected.size < RULES.maxRisks) c.selected.add(id);
     else toast(`Maximum ${RULES.maxRisks} risques pour garder un tour de notation court`);
+    saveConsolidation();
     render();
   },
   adopt: (el) => addCustom(el.dataset.text),
@@ -1212,6 +1308,7 @@ function addCustom(label) {
   const id = 'c' + (c.custom.length + 1) + '-' + Math.random().toString(36).slice(2, 6);
   c.custom.push({ id, label: text.charAt(0).toUpperCase() + text.slice(1) });
   if (c.selected.size < RULES.maxRisks) c.selected.add(id);
+  saveConsolidation();
   render();
   app.querySelector('[data-form="add"] input')?.focus();
 }
@@ -1235,8 +1332,9 @@ function nextQuestion() {
   }
 }
 
-function showResults() {
+async function showResults() {
   firedFor = null;
+  await refreshAll();
   setState({ phase: 'results', resultIndex: 0, timer: null });
 }
 
@@ -1266,7 +1364,7 @@ function tick() {
   }
   if (state.phase === 'interlude' && d) d.querySelector('[data-label]').textContent = 'secondes';
   const token = `${state.phase}-${state.round}-${state.qIndex}`;
-  if (left <= 0 && t.pausedLeft == null && firedFor !== token) {
+  if (!passive && left <= 0 && t.pausedLeft == null && firedFor !== token) {
     firedFor = token;
     if (state.phase === 'question') nextQuestion();
     else showResults();
@@ -1292,7 +1390,7 @@ function toggleFullscreen() {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms = 3200) {
   let el = document.querySelector('.toast');
   if (!el) {
     el = document.createElement('div');
@@ -1302,13 +1400,14 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
 function bindGlobal() {
   app.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
     if (!el || el.disabled) return;
+    if (passive && !['takeOver', 'fullscreen', 'zoomQr'].includes(el.dataset.act)) return;
     const fn = actions[el.dataset.act];
     if (fn) fn(el);
   });
@@ -1377,7 +1476,7 @@ function scheduleBots() {
     const stubborn = round >= 3 && (prevAgreement ?? 1) < 0.72 && Math.random() < (round === 3 ? 0.6 : 0.05);
     botTimers.push(setTimeout(() => {
       if (state.phase !== 'question' || state.round !== round) return;
-      store.upsertAnswers(code, [{ participant_id: p.id, round, qkey: q.key, payload: botPayload(p, round, q, stubborn) }]);
+      store.hostAnswers(code, [{ participant_id: p.id, round, qkey: q.key, payload: botPayload(p, round, q, stubborn) }]).catch(() => {});
     }, delay));
   }
 }

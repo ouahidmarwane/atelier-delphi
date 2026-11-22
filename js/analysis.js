@@ -1,5 +1,5 @@
 // Analyse des réponses en temps réel : thèmes, doublons, statistiques et constats.
-import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221412';
+import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221445';
 
 export function normalize(text) {
   return ' ' + String(text || '')
@@ -41,7 +41,17 @@ function has(norm, words, stem) {
   return false;
 }
 
+// Mémoïsé : l'analyse en direct relit les mêmes réponses à chaque nouvelle réponse reçue
+const themeCache = new Map();
 export function matchThemes(line) {
+  if (themeCache.has(line)) return themeCache.get(line);
+  const out = matchThemesRaw(line);
+  if (themeCache.size > 5000) themeCache.clear();
+  themeCache.set(line, out);
+  return out;
+}
+
+function matchThemesRaw(line) {
   const norm = normalize(line);
   const words = norm.trim().split(' ');
   const out = [];
