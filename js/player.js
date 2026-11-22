@@ -1,9 +1,9 @@
 // Écran téléphone : l'étudiant rejoint, puis répond à chaque question du tour en cours.
-import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName, QUIZ, QUIZ_COLORS, quizShape } from './content.js?v=202611221732';
-import { fmt } from './analysis.js?v=202611221732';
-import { icon, esc, mmss } from './ui.js?v=202611221732';
-import { uid } from './store.js?v=202611221732';
-import { ambient, ripples, spotlight, vibrate, keepAwake } from './fx.js?v=202611221732';
+import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName, QUIZ, QUIZ_COLORS, quizShape, quizRight, quizMask, quizPicked } from './content.js?v=202611221833';
+import { fmt } from './analysis.js?v=202611221833';
+import { icon, esc, mmss } from './ui.js?v=202611221833';
+import { uid } from './store.js?v=202611221833';
+import { ambient, ripples, spotlight, vibrate, keepAwake } from './fx.js?v=202611221833';
 
 const app = document.getElementById('app');
 let store;
@@ -389,12 +389,13 @@ function renderQuiz() {
   } else if (zs.stage === 'question') {
     const done = mine.get('100|' + z.id);
     if (done) {
-      body = `<div class="qp-full qp-wait"><span class="qp-picked" style="--qc:${QUIZ_COLORS[done.c]}">${quizShape(done.c)}</span><h1>Réponse envoyée</h1><p>Attendez les autres joueurs…</p></div>`;
+      body = `<div class="qp-full qp-wait"><div class="qp-picks">${quizPicked(z, done.c).map((k) => `<span class="qp-picked" style="--qc:${QUIZ_COLORS[k]}">${quizShape(k)}</span>`).join('')}</div><h1>Réponse envoyée</h1><p>Attendez les autres joueurs…</p></div>`;
     } else {
-      body = `<p class="qp-count">Question ${zs.index + 1} sur ${QUIZ.length}</p>
+      body = `<p class="qp-count">Question ${zs.index + 1} sur ${QUIZ.length}${z.multi ? ' · <b>plusieurs réponses possibles</b>' : ''}</p>
         <div class="qp-timebar"><span data-qpbar></span></div>
         <div class="qp-grid n${z.a.length}">${z.a.map((t, k) => `
-          <button class="qp-btn" style="--qc:${QUIZ_COLORS[k]}" data-c="${k}">${quizShape(k)}<span>${esc(t)}</span></button>`).join('')}</div>
+          <button class="qp-btn" style="--qc:${QUIZ_COLORS[k]}" data-c="${k}">${quizShape(k)}<span>${esc(t)}</span><i class="qp-tick">${icon('check')}</i></button>`).join('')}</div>
+        ${z.multi ? '<button class="btn primary lg qp-validate" data-validate disabled>Valider</button>' : ''}
         <p class="status" data-qstatus></p>`;
     }
   } else if (zs.stage === 'reveal' || zs.stage === 'board') {
@@ -404,7 +405,7 @@ function renderQuiz() {
     body = `<div class="qp-full qp-result ${cls}">
       <span class="qp-mark">${icon(st === 1 ? 'check' : 'x')}</span>
       <h1>${title}</h1>
-      ${st === 1 ? `<p class="qp-gain num">+${res[2]}</p>` : `<p>La bonne réponse : <b>${esc(z.a[z.c])}</b></p>`}
+      ${st === 1 ? `<p class="qp-gain num">+${res[2]}</p>` : `<p>${z.multi ? 'Les bonnes réponses' : 'La bonne réponse'} : <b>${quizRight(z).map((k) => esc(z.a[k])).join(' · ')}</b></p>`}
       ${place}
     </div>`;
   } else {
@@ -417,15 +418,29 @@ function renderQuiz() {
     </div>`;
   }
   app.innerHTML = `<main class="p-wrap quiz-phone">${head}${body}</main>`;
-  app.querySelectorAll('.qp-btn').forEach((btn) => btn.addEventListener('click', () => sendQuiz(z, Number(btn.dataset.c))));
+  if (z?.multi) {
+    // Choix multiple : on coche plusieurs couleurs puis on valide
+    const picked = new Set();
+    const validate = app.querySelector('[data-validate]');
+    app.querySelectorAll('.qp-btn').forEach((btn) => btn.addEventListener('click', () => {
+      const k = Number(btn.dataset.c);
+      picked.has(k) ? picked.delete(k) : picked.add(k);
+      btn.classList.toggle('on', picked.has(k));
+      vibrate(15);
+      if (validate) validate.disabled = !picked.size;
+    }));
+    validate?.addEventListener('click', () => sendQuiz(z, quizMask([...picked]), [...picked]));
+  } else {
+    app.querySelectorAll('.qp-btn').forEach((btn) => btn.addEventListener('click', () => sendQuiz(z, Number(btn.dataset.c))));
+  }
   quizTickPhone();
 }
 
-async function sendQuiz(z, c) {
+async function sendQuiz(z, c, list = [c]) {
   if (sending) return;
   sending = true;
   vibrate(30);
-  app.querySelectorAll('.qp-btn').forEach((b) => { b.disabled = true; b.classList.toggle('on', Number(b.dataset.c) === c); });
+  app.querySelectorAll('.qp-btn, [data-validate]').forEach((b) => { b.disabled = true; if (b.dataset.c != null) b.classList.toggle('on', list.includes(Number(b.dataset.c))); });
   try {
     await store.submitAnswer(code, { participant_id: me.id, round: 100, qkey: z.id, payload: { c } }, me.secret);
     mine.set('100|' + z.id, { c });
@@ -436,7 +451,7 @@ async function sendQuiz(z, c) {
       const s = app.querySelector('[data-qstatus]');
       if (s) { s.className = 'status err'; s.textContent = 'Trop tard, le temps est écoulé'; }
     } else {
-      app.querySelectorAll('.qp-btn').forEach((b) => { b.disabled = false; b.classList.remove('on'); });
+      app.querySelectorAll('.qp-btn, [data-validate]').forEach((b) => { b.disabled = false; });
       const s = app.querySelector('[data-qstatus]');
       if (s) { s.className = 'status err'; s.textContent = 'Envoi impossible, touchez à nouveau'; }
     }

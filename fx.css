@@ -488,3 +488,15 @@ html, body { overflow-x: clip; }
 .ruler li { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ruler li.now { flex: none; overflow: visible; }
 @media (max-width: 1700px) { .topbar .brand .sub { display: none; } .session { gap: 0.8rem; } }
+
+/* Quiz : question à choix multiples */
+.quiz-multi { text-align: center; color: var(--text-2); margin-top: -8px; }
+.qp-btn { position: relative; }
+.qp-tick { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.8); color: transparent; font-style: normal; }
+.qp-tick svg { width: 16px; height: 16px; stroke-width: 3; }
+.quiz-phone .qp-grid:not(:has(+ .qp-validate)) .qp-tick { display: none; }
+.qp-btn.on .qp-tick { background: #fff; color: var(--qc); }
+.qp-grid:has(+ .qp-validate) .qp-btn.on { opacity: 1; transform: scale(0.97); }
+.qp-validate { margin-top: 12px; width: 100%; }
+.qp-picks { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.qp-picks .qp-picked { width: 72px; height: 72px; }

@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS, QUIZ, QUIZ_DURATION, QUIZ_COLORS, quizShape, quizPoints } from './content.js?v=202611221732';
-import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221732';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221732';
-import { uid, aiGroup } from './store.js?v=202611221732';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221732';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, isPrudent, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS, QUIZ, QUIZ_DURATION, QUIZ_COLORS, quizShape, quizPoints, quizRight, quizMask, quizPicked, quizIsRight } from './content.js?v=202611221833';
+import { stats, matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221833';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221833';
+import { uid, aiGroup } from './store.js?v=202611221833';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight, keepAwake } from './fx.js?v=202611221833';
 
 const app = document.getElementById('app');
 let store;
@@ -1652,7 +1652,7 @@ function quizScores(upto) {
     for (const a of quizAnswers(z.id)) {
       const r = rows.get(a.participant_id);
       if (!r) continue;
-      const pts = quizPoints(Number(a.payload?.c) === z.c, a.payload?.ms);
+      const pts = quizPoints(quizIsRight(z, a.payload?.c), a.payload?.ms);
       r.total += pts;
       if (i === upto) {
         r.gained = pts;
@@ -1678,7 +1678,7 @@ async function quizReveal() {
   // Résultat de chacun, lu par son téléphone : [rang, total, points gagnés, juste (1), faux (0) ou sans réponse (-1)]
   const res = {};
   ranks.forEach((r, k) => { res[r.p.id] = [k + 1, r.total, r.gained, r.correct === null ? -1 : r.correct ? 1 : 0]; });
-  setState({ timer: null, quiz: { ...z, stage: 'reveal', correct: QUIZ[z.index].c, res } });
+  setState({ timer: null, quiz: { ...z, stage: 'reveal', res } });
 }
 
 function quizNext() {
@@ -1720,8 +1720,12 @@ function scheduleQuizBots(z) {
   for (const p of bots) {
     const ms = 1500 + Math.random() * 11000;
     const right = Math.random() < 0.72;
-    const wrong = z.a.map((_, k) => k).filter((k) => k !== z.c);
-    const c = right ? z.c : pick(wrong);
+    const good = quizRight(z);
+    const wrong = z.a.map((_, k) => k).filter((k) => !good.includes(k));
+    // Choix multiple : une bonne réponse oubliée ou une mauvaise ajoutée
+    const c = z.multi
+      ? (right ? quizMask(good) : quizMask(Math.random() < 0.5 ? good.slice(1) : [...good, pick(wrong)]))
+      : (right ? z.c : pick(wrong));
     botTimers.push(setTimeout(() => {
       if (state.phase !== 'quiz' || state.quiz.key !== z.id || state.quiz.stage !== 'question') return;
       const row = { participant_id: p.id, round: 100, qkey: z.id, payload: { c, ms: Math.round(ms) } };
@@ -1732,21 +1736,25 @@ function scheduleQuizBots(z) {
   }
 }
 
+const quizCounts = (z) => z.a.map((_, k) => quizAnswers(z.id).filter((a) => quizPicked(z, Number(a.payload?.c)).includes(k)).length);
+
 function quizTiles(z, reveal) {
-  const counts = z.a.map((_, k) => quizAnswers(z.id).filter((a) => Number(a.payload?.c) === k).length);
+  const counts = quizCounts(z);
+  const good = quizRight(z);
   return `<div class="qtiles n${z.a.length}">${z.a.map((t, k) => `
-    <div class="qtile ${reveal ? (k === z.c ? 'right' : 'wrong') : ''}" style="--qc:${QUIZ_COLORS[k]}">
+    <div class="qtile ${reveal ? (good.includes(k) ? 'right' : 'wrong') : ''}" style="--qc:${QUIZ_COLORS[k]}">
       ${quizShape(k)}<span class="qt-text">${esc(t)}</span>
-      ${reveal ? `<span class="qt-count num">${counts[k]}</span>${k === z.c ? `<span class="qt-check">${icon('check')}</span>` : ''}` : ''}
+      ${reveal ? `<span class="qt-count num">${counts[k]}</span>${good.includes(k) ? `<span class="qt-check">${icon('check')}</span>` : ''}` : ''}
     </div>`).join('')}</div>`;
 }
 
 function quizBars(z) {
-  const counts = z.a.map((_, k) => quizAnswers(z.id).filter((a) => Number(a.payload?.c) === k).length);
+  const counts = quizCounts(z);
+  const good = quizRight(z);
   const max = Math.max(1, ...counts);
   return `<div class="qbars">${counts.map((n, k) => `
-    <div class="qbar-col ${k === z.c ? 'right' : ''}" style="--qc:${QUIZ_COLORS[k]}">
-      <span class="qb-n num">${n}${k === z.c ? icon('check') : ''}</span>
+    <div class="qbar-col ${good.includes(k) ? 'right' : ''}" style="--qc:${QUIZ_COLORS[k]}">
+      <span class="qb-n num">${n}${good.includes(k) ? icon('check') : ''}</span>
       <span class="qb-bar" style="--h:${Math.max(4, (n / max) * 100)}%"></span>
       <span class="qb-shape">${quizShape(k)}</span>
     </div>`).join('')}</div>`;
@@ -1769,6 +1777,7 @@ function quizStage() {
     return `<section class="quiz enter" data-q="quiz-${zs.index}">
       ${head}
       <h1 class="quiz-q">${esc(z.q)}</h1>
+      ${z.multi ? '<p class="quiz-multi">Plusieurs réponses possibles</p>' : ''}
       <div class="quiz-mid">
         <div class="quiz-timer"><b class="num" data-qtime>${QUIZ_DURATION}</b></div>
         <div class="quiz-bar"><span data-qbar></span></div>

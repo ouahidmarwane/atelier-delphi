@@ -249,17 +249,20 @@ export const BOT_MEASURES = {
 // c : index de la bonne réponse. Les couleurs et formes suivent l'ordre des choix.
 export const QUIZ_DURATION = 20;
 export const QUIZ = [
-  { id: 'z1', q: 'Selon l’ISO 31000, quelles étapes forment l’appréciation du risque ?', a: ['Identification, analyse, évaluation', 'Identification, traitement, suivi', 'Analyse, traitement, communication', 'Évaluation, contrôle, audit'], c: 0 },
-  { id: 'z2', q: 'Dans le cours, Delphi est d’abord classée comme une technique…', a: ['de traitement des risques', 'd’identification des risques', 'de communication de crise', 'de surveillance'], c: 1 },
-  { id: 'z3', q: 'Qui a développé la méthode Delphi dans les années 1950 ?', a: ['L’ISO', 'La NASA', 'La RAND Corporation', 'Toyota'], c: 2 },
-  { id: 'z4', q: 'Lequel de ces éléments n’est PAS un principe de Delphi ?', a: ['Anonymat', 'Itération', 'Retour contrôlé', 'Débat en face à face'], c: 3 },
-  { id: 'z5', q: 'Pourquoi les réponses restent-elles anonymes ?', a: ['Pour réduire l’influence des personnalités dominantes', 'Pour aller plus vite', 'Pour ne pas avoir à justifier', 'Pour se passer du coordinateur'], c: 0 },
-  { id: 'z6', q: 'Le « retour contrôlé », c’est…', a: ['Le coordinateur corrige les réponses', 'Une synthèse anonyme communiquée entre les tours', 'Un débat oral entre experts', 'Un vote à main levée'], c: 1 },
-  { id: 'z7', q: 'Quand arrête-t-on les tours ?', a: ['Après exactement deux tours', 'Quand le coordinateur est d’accord', 'Au consensus ou à la stabilisation des réponses', 'Quand tout le monde donne la même note'], c: 2 },
-  { id: 'z8', q: 'Delphi est surtout utile quand…', a: ['Les données historiques manquent', 'Les statistiques sont complètes', 'Un seul expert est disponible', 'La décision est déjà prise'], c: 0 },
-  { id: 'z9', q: 'Vrai ou faux : la convergence des avis prouve que la réponse est vraie.', a: ['Vrai', 'Faux'], c: 1 },
-  { id: 'z10', q: 'Sur notre matrice, un risque de Gravité 4 est classé en…', a: ['Priorité 3', 'Priorité 2', 'Priorité 1', 'Hors matrice'], c: 2 },
+  { id: 'z1', q: 'Quelle est la définition correcte de la méthode Delphi ?', a: ['Une méthode de calcul financier des risques', 'Une méthode de consultation anonyme et successive d’experts', 'Une méthode de contrôle des performances industrielles', 'Une réunion collective de négociation entre responsables'], c: 1 },
+  { id: 'z2', q: 'Quels sont les principes fondamentaux de la méthode Delphi ?', a: ['Le retour contrôlé des réponses', 'Les consultations successives', 'Le débat direct obligatoire entre tous les experts', 'L’anonymat des experts'], c: [0, 1, 3], multi: true },
+  { id: 'z3', q: 'Dans la méthode Delphi, le consensus signifie obligatoirement que tous les experts donnent exactement la même réponse.', a: ['Vrai', 'Faux'], c: 1 },
+  { id: 'z4', q: 'Selon le cours et l’ISO 31000:2018, quelles sont les trois activités qui composent l’appréciation des risques ?', a: ['Identification, analyse et évaluation', 'Prévision, budgétisation et audit', 'Planification, production et contrôle', 'Détection, correction et maintenance'], c: 0 },
+  { id: 'z5', q: 'Quel est le rôle de l’anonymat dans la méthode Delphi ?', a: ['Éliminer les désaccords entre experts', 'Accélérer automatiquement tous les questionnaires', 'Remplacer les experts par des données statistiques', 'Éviter l’influence des personnes dominantes'], c: 3 },
+  { id: 'z6', q: 'À la fin de la procédure Delphi, quel résultat cherche-t-on à obtenir ?', a: ['Une décision imposée par l’expert le plus expérimenté', 'Une liste des experts classés selon leur ancienneté', 'Une liste hiérarchisée des risques, de leurs impacts et des mesures de maîtrise proposées', 'Une suppression automatique de tous les risques'], c: 2 },
+  { id: 'z7', q: 'Delphi est surtout utile quand…', a: ['Les données historiques manquent', 'Les statistiques sont complètes', 'Un seul expert est disponible', 'La décision est déjà prise'], c: 0 },
+  { id: 'z8', q: 'Vrai ou faux : la convergence des avis prouve que la réponse est vraie.', a: ['Vrai', 'Faux'], c: 1 },
 ];
+// Bonnes réponses sous forme d'ensemble, et masque envoyé par le téléphone pour les questions à choix multiples
+export const quizRight = (z) => (z.multi ? z.c : [z.c]);
+export const quizMask = (list) => list.reduce((m, k) => m | (1 << k), 0);
+export const quizPicked = (z, c) => (z.multi ? z.a.map((_, k) => k).filter((k) => (c >> k) & 1) : [c]);
+export const quizIsRight = (z, c) => (z.multi ? Number(c) === quizMask(z.c) : Number(c) === z.c);
 export const QUIZ_COLORS = ['#e0453a', '#2f6fd6', '#d9a21b', '#3d9a4a'];
 export const QUIZ_SHAPES = [
   '<path d="M12 3 22 20H2z"/>',
