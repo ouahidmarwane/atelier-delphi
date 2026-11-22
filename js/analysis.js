@@ -1,5 +1,5 @@
 // Analyse des réponses en temps réel : thèmes, doublons, statistiques et constats.
-import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221244';
+import { THEMES, themeById, deptById, RULES, priorityOf, decisionById, DEPARTMENTS } from './content.js?v=202611221302';
 
 export function normalize(text) {
   return ' ' + String(text || '')
@@ -11,13 +11,42 @@ export function normalize(text) {
     .trim() + ' ';
 }
 
-const has = (norm, stem) => norm.includes(' ' + stem);
+// Distance d'édition (fautes de frappe : lettre oubliée, en trop, remplacée ou inversée)
+function distance(a, b) {
+  const m = a.length;
+  const n = b.length;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[m][n];
+}
+
+// Un mot correspond à un début de mot-clé, exactement ou avec une faute de frappe
+function has(norm, words, stem) {
+  if (norm.includes(' ' + stem)) return true;
+  if (stem.includes(' ') || stem.length < 6) return false;
+  const tol = stem.length >= 9 ? 2 : 1;
+  for (const w of words) {
+    if (w.length < stem.length - 1) continue;
+    for (let L = stem.length - 1; L <= Math.min(w.length, stem.length + 1); L++) {
+      if (distance(w.slice(0, L), stem) <= tol) return true;
+    }
+  }
+  return false;
+}
 
 export function matchThemes(line) {
   const norm = normalize(line);
+  const words = norm.trim().split(' ');
   const out = [];
   for (const t of THEMES) {
-    const hit = t.kw.some((k) => (Array.isArray(k) ? k.every((s) => has(norm, s)) : has(norm, k)));
+    const hit = t.kw.some((k) => (Array.isArray(k) ? k.every((s) => has(norm, words, s)) : has(norm, words, k)));
     if (hit) out.push(t.id);
   }
   return out;

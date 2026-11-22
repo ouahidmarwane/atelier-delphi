@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, BOT_LINES, BOT_NAMES, BOT_MEASURES } from './content.js?v=202611221244';
-import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221244';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221244';
-import { uid } from './store.js?v=202611221244';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221244';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, BOT_LINES, BOT_NAMES, BOT_MEASURES } from './content.js?v=202611221302';
+import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221302';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221302';
+import { uid } from './store.js?v=202611221302';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221302';
 
 const app = document.getElementById('app');
 let store;
