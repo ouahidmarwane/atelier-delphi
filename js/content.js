@@ -11,7 +11,6 @@ export const SCENARIO = {
     { figure: '30', unit: 'opérateurs', text: 'à recruter et à former' },
     { figure: '1', unit: 'fournisseur', text: 'de matière première qualifié, et un seul' },
     { figure: '85 %', unit: 'de capacité', text: 'déjà utilisés dans l’usine actuelle' },
-    { figure: '< 50', unit: 'ppm', text: 'pièces défectueuses par million exigées, audit client avant démarrage' },
   ],
   // Frise de 12 semaines affichée sous le scénario
   timeline: [
@@ -196,7 +195,7 @@ export const BOT_LINES = {
     q4: ['Plan de maintenance préventive dès l’installation', 'Commander les pièces de rechange avec les machines', 'Former les techniciens chez le fabricant'],
   },
   qual: {
-    q1: ['Pièces non conformes au démarrage', 'Échec de l’audit du constructeur', 'Taux de défaut au-dessus de 50 ppm', 'Absence de procédures de contrôle'],
+    q1: ['Pièces non conformes au démarrage', 'Échec de l’audit du constructeur', 'Taux de défaut trop élevé', 'Absence de procédures de contrôle'],
     q2: ['Mauvais réglage des machines', 'Contrôle qualité insuffisant', 'Opérateurs inexpérimentés', 'Mauvaise interprétation du cahier des charges'],
     q3: ['Rebuts et retouches', 'Réclamations client', 'Livraison de pièces défectueuses'],
     q4: ['Contrôle à 100 % pendant le premier mois', 'Audit blanc avant l’audit client', 'Fiches de réglage validées'],

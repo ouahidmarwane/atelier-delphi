@@ -73,7 +73,7 @@ function prompt(p: Payload) {
   const themes = p.themes.map((t) => `- ${t.id} : ${t.label}`).join("\n");
   const lines = p.lines.map((l) => `${l.id} | ${l.q} | ${l.text}`).join("\n");
   return `Tu analyses les réponses d'étudiants à un atelier Delphi de gestion des risques.
-Scénario : MecaParts Maroc lance en 3 mois une nouvelle ligne de production de pièces moteur en aluminium pour un constructeur automobile (machines importées livrées en 8 semaines, 30 opérateurs à recruter et former, un seul fournisseur de matière, usine déjà à 85 % de capacité, exigence de moins de 50 ppm et audit client, pénalité de 2 % par semaine de retard).
+Scénario : MecaParts Maroc lance en 3 mois une nouvelle ligne de production de pièces moteur en aluminium pour un constructeur automobile (machines importées livrées en 8 semaines, 30 opérateurs à recruter et former, un seul fournisseur de matière, usine déjà à 85 % de capacité, pénalité de 2 % par semaine de retard).
 
 Questions :
 ${qs}
