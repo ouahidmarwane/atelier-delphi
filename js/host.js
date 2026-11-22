@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, BOT_LINES, BOT_NAMES, BOT_MEASURES } from './content.js?v=202611221302';
-import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221302';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221302';
-import { uid } from './store.js?v=202611221302';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221302';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES } from './content.js?v=202611221322';
+import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221322';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221322';
+import { uid, aiGroup } from './store.js?v=202611221322';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221322';
 
 const app = document.getElementById('app');
 let store;
@@ -105,6 +105,7 @@ async function openSession(c) {
   const [ps, as] = await Promise.all([store.listParticipants(code), store.listAnswers(code)]);
   ps.forEach((p) => participants.set(p.id, p));
   as.forEach((a) => answers.set(akey(a), a));
+  loadAi();
   store.subscribe(code, onEvent);
   render();
   setInterval(tick, 200);
@@ -154,9 +155,134 @@ function round1Analysis() {
   const ans = answersOf(1);
   const ppl = people();
   const byQuestion = {};
-  ROUND1_QUESTIONS.forEach((q) => { byQuestion[q.key] = analyzeOpen(ans.filter((a) => a.qkey === q.key), ppl); });
-  const candidates = candidateRisks(ans, ppl);
+  const useAi = ai?.status === 'ok';
+  ROUND1_QUESTIONS.forEach((q) => {
+    const rows = ans.filter((a) => a.qkey === q.key);
+    byQuestion[q.key] = useAi ? aiOpen(q.key, rows, ppl) : analyzeOpen(rows, ppl);
+  });
+  const candidates = useAi ? aiCandidates(byQuestion.q1) : candidateRisks(ans, ppl);
   return { byQuestion, candidates, insights: insightsRound1(byQuestion, candidates, participants.size) };
+}
+
+// ---------- Regroupement par l'IA ----------
+
+let ai = null;
+const aiKey = () => 'delphi-ai:' + code;
+
+function loadAi() {
+  try {
+    ai = JSON.parse(localStorage.getItem(aiKey())) || null;
+    if (ai?.status === 'pending') ai = null;
+  } catch {
+    ai = null;
+  }
+}
+
+function saveAi() {
+  try {
+    localStorage.setItem(aiKey(), JSON.stringify(ai));
+  } catch {}
+}
+
+async function runAi() {
+  const ppl = people();
+  const refs = [];
+  const lines = [];
+  for (const q of ROUND1_QUESTIONS) {
+    let n = 0;
+    for (const a of answersOf(1).filter((x) => x.qkey === q.key)) {
+      splitLines(a.payload?.text).forEach((text, k) => {
+        const id = `${q.key}-${++n}`;
+        refs.push({ id, pid: a.participant_id, q: q.key, k, text });
+        lines.push({ id, q: q.key, text });
+      });
+    }
+  }
+  if (!lines.length) return;
+  ai = { status: 'pending', started: Date.now() };
+  refreshAiViews();
+  try {
+    const out = await aiGroup({
+      questions: ROUND1_QUESTIONS.map((q) => ({ key: q.key, title: q.title })),
+      themes: THEMES.map((t) => ({ id: t.id, label: t.label })),
+      lines,
+    });
+    const byId = Object.fromEntries(refs.map((r) => [r.id, r]));
+    const groups = {};
+    for (const q of out.questions || []) {
+      groups[q.q] = (q.groups || []).map((g) => ({
+        label: g.label,
+        theme: themeById[g.theme] ? g.theme : '',
+        refs: g.ids.map((id) => byId[id]).filter(Boolean).map((r) => `${r.pid}|${r.q}|${r.k}`),
+      }));
+    }
+    ai = { status: 'ok', model: out.model, groups, at: Date.now() };
+  } catch (err) {
+    ai = { status: 'error', message: err.message || String(err) };
+  }
+  saveAi();
+  if (consolidation && !consolidation.touched) consolidation = null;
+  refreshAiViews();
+}
+
+function refreshAiViews() {
+  if (state.phase === 'results' && state.round === 1) render();
+  else if (state.phase === 'consolidate') render();
+}
+
+const offTopic = (label) => /hors sujet/i.test(label);
+const slug = (s) => normalize(s).trim().replace(/ /g, '-').slice(0, 40);
+
+// Même format que l'analyse par mots-clés, mais avec les groupes de l'IA
+function aiOpen(qkey, rows, ppl) {
+  const groups = ai.groups[qkey] || [];
+  const where = new Map();
+  groups.forEach((g, gi) => g.refs.forEach((r) => where.set(r, gi)));
+  const themes = groups.map((g, gi) => ({
+    id: g.theme || 'ai-' + slug(g.label) || 'ai-' + gi,
+    label: g.theme ? themeById[g.theme].label : g.label,
+    count: 0, people: new Set(), depts: new Set(), samples: [], ai: !g.theme, off: offTopic(g.label),
+  }));
+  const other = [];
+  let lines = 0;
+  const respondents = new Set();
+  for (const a of rows) {
+    const dept = ppl[a.participant_id]?.dept;
+    splitLines(a.payload?.text).forEach((text, k) => {
+      lines++;
+      respondents.add(a.participant_id);
+      let gi = where.get(`${a.participant_id}|${qkey}|${k}`);
+      if (gi == null) {
+        // Réponse arrivée après l'analyse : on tente les mots-clés
+        const ids = matchThemes(text);
+        gi = themes.findIndex((t) => ids.includes(t.id));
+        if (gi < 0) { other.push({ text, dept }); return; }
+      }
+      const t = themes[gi];
+      if (t.off) { other.push({ text, dept }); return; }
+      t.count++;
+      t.people.add(a.participant_id);
+      if (dept) t.depts.add(dept);
+      if (t.samples.length < 40) t.samples.push({ text, dept });
+    });
+  }
+  const list = themes
+    .filter((t) => t.count && !t.off)
+    .map((t) => ({ ...t, people: t.people.size, depts: DEPARTMENTS.map((d) => d.id).filter((id) => t.depts.has(id)) }))
+    .sort((a, b) => b.count - a.count || b.depts.length - a.depts.length);
+  return { themes: list, other, lines, respondents: respondents.size };
+}
+
+function aiCandidates(q1) {
+  const list = [...q1.themes].sort((a, b) => b.depts.length - a.depts.length || b.count - a.count);
+  return { list, unmatched: q1.other };
+}
+
+function aiBadge() {
+  if (!ai) return '';
+  if (ai.status === 'pending') return `<span class="ai-badge pending"><i class="spin"></i>Analyse par l’IA en cours…</span>`;
+  if (ai.status === 'ok') return `<span class="ai-badge ok">${icon('check')}Regroupé par l’IA${ai.model ? ` · ${esc(ai.model)}` : ''}</span>`;
+  return `<span class="ai-badge error" title="${esc(ai.message)}">IA indisponible, regroupement par mots-clés</span>`;
 }
 
 const ratingResults = (round) => analyzeRatings(answersOf(round), risksOf(round));
@@ -473,7 +599,7 @@ function results1Stage() {
   const shown = a.themes.slice(0, 9);
   const bars = shown.map((t, i) => `
     <li class="tbar ${i === 0 ? 'lead' : ''}" style="--i:${i}">
-      <span class="tlabel">${esc(t.label)}</span>
+      <span class="tlabel">${esc(t.label)}${t.ai ? '<span class="new-tag">nouveau</span>' : ''}</span>
       <span class="ttrack"><span class="tfill" style="width:${(100 * t.count) / max}%"></span></span>
       <span class="tcount num">${t.count}</span>
       ${deptDots(t.depts)}
@@ -482,7 +608,7 @@ function results1Stage() {
   return `
   <section class="results enter">
     <header class="res-head">
-      <p class="eyebrow">Tour 1 · Résultats · Question ${idx + 1} sur ${ROUND1_QUESTIONS.length}</p>
+      <p class="eyebrow">Tour 1 · Résultats · Question ${idx + 1} sur ${ROUND1_QUESTIONS.length} ${aiBadge()}</p>
       <h2>${esc(q.title)}</h2>
     </header>
     <div class="res-grid">
@@ -562,7 +688,7 @@ function consolidateStage() {
   return `
   <section class="consolidate enter">
     <header class="res-head">
-      <p class="eyebrow">Analyse du tour 1 · Consolidation</p>
+      <p class="eyebrow">Analyse du tour 1 · Consolidation ${aiBadge()}</p>
       <h2>Liste des risques sans doublons</h2>
       <p class="muted">Les réponses identiques entre départements sont fusionnées. Gardez jusqu’à ${RULES.maxRisks} risques pour le tour de notation.</p>
     </header>
@@ -854,7 +980,7 @@ function controls() {
     case 'results': {
       const count = state.round === 1 ? ROUND1_QUESTIONS.length : ratingViews().length;
       const nav = `<div class="pager">${b('prevView', '', 'icon', 'chevron-left')}<span class="num">${Math.min(state.resultIndex, count - 1) + 1} / ${count}</span>${b('nextView', '', 'icon', 'chevron-right')}</div>`;
-      if (state.round === 1) right = nav + b('toConsolidate', 'Consolider la liste', 'primary', 'arrow-right');
+      if (state.round === 1) right = nav + (ai?.status === 'pending' ? '' : b('rerunAi', 'Relancer l’IA', 'ghost', 'rotate')) + b('toConsolidate', 'Consolider la liste', 'primary', 'arrow-right');
       else if (state.round === 2) right = nav + b('toEvaluate', 'Clore et évaluer', 'ghost') + b('nextRound', 'Lancer le tour 3', 'primary', 'arrow-right');
       else {
         const open = ratingResults(state.round).filter((x) => x.n && !x.consensus).length;
@@ -907,6 +1033,7 @@ const actions = {
     const count = state.round === 1 ? ROUND1_QUESTIONS.length : ratingViews().length;
     setState({ resultIndex: Math.min(count - 1, state.resultIndex + 1) });
   },
+  rerunAi: () => runAi(),
   toConsolidate: () => {
     consolidation = null;
     ensureConsolidation();
@@ -915,6 +1042,7 @@ const actions = {
   backResults: () => setState({ phase: 'results', round: 1, resultIndex: 0 }),
   toggle: (el) => {
     const c = ensureConsolidation();
+    c.touched = true;
     const id = el.dataset.id;
     if (c.selected.has(id)) c.selected.delete(id);
     else if (c.selected.size < RULES.maxRisks) c.selected.add(id);
@@ -965,6 +1093,7 @@ function addCustom(label) {
   const text = String(label || '').trim();
   if (!text) return;
   const c = ensureConsolidation();
+  c.touched = true;
   const id = 'c' + (c.custom.length + 1) + '-' + Math.random().toString(36).slice(2, 6);
   c.custom.push({ id, label: text.charAt(0).toUpperCase() + text.slice(1) });
   if (c.selected.size < RULES.maxRisks) c.selected.add(id);
@@ -986,6 +1115,7 @@ function nextQuestion() {
   else {
     clearBots();
     firedFor = null;
+    if (state.round === 1) setTimeout(runAi, 400);
     setState({ phase: 'interlude', timer: { duration: RULES.interlude, endsAt: Date.now() + RULES.interlude * 1000, pausedLeft: null } });
   }
 }

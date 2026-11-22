@@ -317,3 +317,12 @@ body { background: var(--bg); }
 @keyframes zoom-in { from { opacity: 0; transform: scale(0.92); } }
 @media (max-width: 1100px) { .qr-zoom-card { grid-template-columns: 1fr; } .qr-zoom .qr-wrap { width: min(70vh, 86vw); } }
 .qr-zoom .qr-wrap::after { display: none; }
+
+/* Analyse par l'IA */
+.ai-badge { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: 0.6rem; padding: 0.15rem 0.55rem; border-radius: 1rem; font-size: 0.8rem; font-weight: 500; vertical-align: middle; }
+.ai-badge .ic { width: 0.95em; height: 0.95em; }
+.ai-badge.ok { background: linear-gradient(90deg, rgba(61, 111, 201, 0.12), rgba(124, 92, 196, 0.14)); color: #4b3fa3; animation: pop-chip 0.5s var(--ease) both; }
+.ai-badge.pending { background: var(--accent-soft); color: var(--accent-ink); }
+.ai-badge.error { background: var(--raised); color: var(--text-3); }
+.spin { width: 0.75rem; height: 0.75rem; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: rotate 0.8s linear infinite; }
+.new-tag { margin-left: 0.5rem; font-size: 0.72rem; padding: 0.05rem 0.4rem; border-radius: 0.3rem; background: rgba(124, 92, 196, 0.12); color: #5b47b0; font-weight: 500; vertical-align: middle; }

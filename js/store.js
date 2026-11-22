@@ -1,5 +1,5 @@
 // Couche de données : même interface pour Supabase (vraie séance) et pour le mode répétition local.
-import { CONFIG } from './config.js?v=202611221302';
+import { CONFIG } from './config.js?v=202611221322';
 
 const answerKey = (r) => `${r.participant_id}|${r.round}|${r.qkey}`;
 
@@ -16,7 +16,7 @@ export async function createStore() {
 }
 
 async function supabaseStore() {
-  const { createClient } = await import('../vendor/supabase.mjs?v=202611221302');
+  const { createClient } = await import('../vendor/supabase.mjs?v=202611221322');
   const sb = createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
     realtime: { params: { eventsPerSecond: 20 } },
   });
@@ -151,6 +151,28 @@ function localStore() {
       return () => listeners.delete(l);
     },
   };
+}
+
+// Regroupement par l'IA (fonction Supabase delphi-ai, qui appelle Gemini)
+export async function aiGroup(payload, timeoutMs = 45000) {
+  if (!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) throw new Error('Supabase non configuré');
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${CONFIG.supabaseUrl}/functions/v1/delphi-ai`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CONFIG.supabaseAnonKey}`, apikey: CONFIG.supabaseAnonKey },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  } catch (err) {
+    throw new Error(err.name === 'AbortError' ? 'délai dépassé' : err.message || String(err));
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 export function uid() {
