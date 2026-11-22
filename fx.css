@@ -284,3 +284,36 @@ body { background: var(--bg); }
 .crit-row { grid-template-columns: 0.35rem 5.5rem minmax(0, 1fr) 2.5rem; }
 .crit-text .muted + .muted { font-size: 0.8rem; }
 .decide button.p2.on { color: #3d3000; }
+
+/* QR code agrandi */
+.qr-btn { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.qr-zoom-hint {
+  position: absolute; right: 0.6rem; bottom: 0.6rem; z-index: 2; display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.35rem 0.6rem; border-radius: 0.45rem; background: rgba(23, 23, 23, 0.85); color: #fff; font-size: 0.82rem; font-weight: 500;
+  opacity: 0; transform: translateY(4px); transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.qr-btn:hover .qr-zoom-hint, .qr-btn:focus-visible .qr-zoom-hint { opacity: 1; transform: none; }
+.qr-btn:hover .qr { transform: scale(1.02); }
+.qr { transition: transform 0.25s var(--ease); }
+.qr-zoom {
+  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 3vh 3vw;
+  background: rgba(245, 245, 243, 0.82); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  animation: fade-in 0.25s var(--ease) both;
+}
+.qr-zoom.leaving { animation: fade-out 0.2s var(--ease) both; }
+.qr-zoom-card {
+  display: grid; grid-template-columns: auto minmax(14rem, auto); gap: 3rem; align-items: center;
+  background: var(--card); border: 1px solid var(--line); border-radius: 1.4rem; padding: 2.5vh 2.5vw;
+  box-shadow: 0 30px 80px -30px rgba(23, 23, 23, 0.35); animation: zoom-in 0.35s var(--ease) both;
+}
+.qr-zoom .qr-wrap { width: min(84vh, 62vw); }
+.qr-zoom-side { display: grid; gap: 0.35rem; align-content: center; }
+.qr-zoom-side .bigcode { font-size: 4.5rem; margin-bottom: 1rem; }
+.zoom-count { font-size: 1.2rem; color: var(--text-2); margin-bottom: 1.2rem; }
+.zoom-count b { font-size: 2.2rem; font-weight: 500; color: var(--accent); margin-right: 0.3rem; }
+.qr-zoom-side .btn { justify-self: start; }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes zoom-in { from { opacity: 0; transform: scale(0.92); } }
+@media (max-width: 1100px) { .qr-zoom-card { grid-template-columns: 1fr; } .qr-zoom .qr-wrap { width: min(70vh, 86vw); } }
+.qr-zoom .qr-wrap::after { display: none; }

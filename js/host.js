@@ -208,6 +208,7 @@ function topbar() {
 
 function render() {
   if (!state) return;
+  if (state.phase !== 'lobby') closeQrZoom();
   app.innerHTML = `<div class="shell phase-${state.phase}">${topbar()}<main class="stage">${stage()}</main>${controls()}</div>`;
   updateConnection();
   tick();
@@ -244,6 +245,11 @@ function renderLive() {
       if (before !== live.querySelector('.received b')?.textContent) bump(live.querySelector('.received b'));
       return;
     }
+  }
+  const zc = document.querySelector('[data-zoom-count]');
+  if (zc && zc.textContent !== String(participants.size)) {
+    zc.textContent = participants.size;
+    bump(zc);
   }
   if (state.phase === 'lobby') {
     const lobby = app.querySelector('[data-lobby]');
@@ -328,7 +334,7 @@ function lobbyStage() {
   return `
   <section class="lobby enter">
     <div class="join-card">
-      <div class="qr-wrap">${qrSvg(url)}</div>
+      <button class="qr-wrap qr-btn" data-act="zoomQr" title="Agrandir le QR code (Q)">${qrSvg(url)}<span class="qr-zoom-hint">${icon('maximize')} Agrandir</span></button>
       <div class="join-meta">
         <span class="muted">Scannez le QR code pour rejoindre</span>
         <span class="muted">Code de la session</span>
@@ -337,6 +343,38 @@ function lobbyStage() {
     </div>
     <div class="lobby-side" data-lobby>${lobbyPeople()}</div>
   </section>`;
+}
+
+// QR code en plein écran pour que le fond de la salle puisse le scanner
+function openQrZoom() {
+  if (document.querySelector('.qr-zoom')) return;
+  const el = document.createElement('div');
+  el.className = 'qr-zoom';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', 'QR code agrandi');
+  el.innerHTML = `
+    <div class="qr-zoom-card">
+      <div class="qr-wrap">${qrSvg(joinUrl())}</div>
+      <div class="qr-zoom-side">
+        <span class="muted">Scannez pour rejoindre</span>
+        <span class="muted">Code de la session</span>
+        <span class="bigcode num">${esc(code)}</span>
+        <span class="zoom-count"><b class="num" data-zoom-count>${participants.size}</b> inscrits</span>
+        <button class="btn" data-close>${icon('x')} Fermer</button>
+        <span class="muted small">Échap ou clic hors du QR pour fermer</span>
+      </div>
+    </div>`;
+  el.addEventListener('click', (e) => {
+    if (e.target === el || e.target.closest('[data-close]')) closeQrZoom();
+  });
+  document.body.appendChild(el);
+}
+
+function closeQrZoom() {
+  const el = document.querySelector('.qr-zoom');
+  if (!el) return;
+  el.classList.add('leaving');
+  setTimeout(() => el.remove(), 200);
 }
 
 function lobbyPeople(seen = null) {
@@ -793,7 +831,7 @@ function finalStage() {
 
 function controls() {
   const k = (key, label) => `<span class="hint"><kbd>${key}</kbd>${label}</span>`;
-  const hints = `<div class="hints">${k('→', 'suivant')}${k('Espace', 'pause')}${k('F', 'plein écran')}</div>`;
+  const hints = `<div class="hints">${k('→', 'suivant')}${k('Espace', 'pause')}${k('F', 'plein écran')}${state.phase === 'lobby' ? k('Q', 'agrandir le QR') : ''}</div>`;
   const b = (act, label, cls = '', ic = '') => `<button class="btn ${cls}" data-act="${act}">${label}${ic ? icon(ic) : ''}</button>`;
   let right = '';
   switch (state.phase) {
@@ -801,7 +839,7 @@ function controls() {
       right = b('toLobby', 'Afficher le QR code', 'primary', 'arrow-right');
       break;
     case 'lobby':
-      right = `${b('toScenario', 'Revoir le scénario', 'ghost')}${state.settings?.rehearsal ? b('addBots', 'Ajouter 20 participants fictifs', '', 'user-plus') : ''}${b('startRound1', 'Démarrer le tour 1', 'primary', 'arrow-right')}`;
+      right = `${b('toScenario', 'Revoir le scénario', 'ghost')}${b('zoomQr', 'Agrandir le QR code', '', 'maximize')}${state.settings?.rehearsal ? b('addBots', 'Ajouter 20 participants fictifs', '', 'user-plus') : ''}${b('startRound1', 'Démarrer le tour 1', 'primary', 'arrow-right')}`;
       break;
     case 'question': {
       const qs = questionsFor(state.round);
@@ -849,6 +887,7 @@ const actions = {
   },
   fullscreen: toggleFullscreen,
   toLobby: () => setState({ phase: 'lobby' }),
+  zoomQr: () => openQrZoom(),
   toScenario: () => setState({ phase: 'scenario' }),
   addBots,
   startRound1: () => startQuestion(1, 0),
@@ -1036,7 +1075,11 @@ function bindGlobal() {
   });
   document.addEventListener('keydown', (e) => {
     if (!state || e.target.closest('input, textarea, select')) return;
-    if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+    if (e.key === 'Escape') closeQrZoom();
+    else if ((e.key === 'q' || e.key === 'Q') && state.phase === 'lobby') {
+      if (document.querySelector('.qr-zoom')) closeQrZoom();
+      else openQrZoom();
+    } else if (e.key === 'f' || e.key === 'F') toggleFullscreen();
     else if (e.key === ' ' && state.phase === 'question') { e.preventDefault(); togglePause(); }
     else if (e.key === 'ArrowRight') {
       if (state.phase === 'results') actions.nextView();
