@@ -91,7 +91,8 @@ Consignes :
 4. Pour la question q4 (les mesures proposées), donne à chaque groupe un intitulé court de mesure, et mets dans "theme" l'identifiant du risque du catalogue que cette mesure réduit, seulement si c'est clair.
 5. Pour les autres questions, laisse "theme" vide et donne à chaque groupe un intitulé court et précis en français.
 6. Ne fusionne pas deux idées différentes juste parce qu'elles concernent le même service.
-7. Une réponse vide de sens ou hors sujet forme un groupe "Hors sujet".`;
+7. Une réponse vide de sens ou hors sujet forme un groupe "Hors sujet".
+8. Un même risque ne forme qu'un seul groupe : ne crée jamais deux groupes avec le même intitulé ou le même identifiant de catalogue.`;
 }
 
 async function callGemini(key: string, model: string, p: Payload, thinking: string | null = "low", ms = 28000, promptText?: string) {
