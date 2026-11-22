@@ -31,13 +31,15 @@ export const DEPARTMENTS = [
 export const deptById = Object.fromEntries(DEPARTMENTS.map((d) => [d.id, d]));
 
 // Étapes de la procédure Delphi du cours, affichées en haut de l'écran projecteur
+export const roundName = (r) => (r === 1 ? 'Identification' : r === 2 ? 'Analyse' : 'Convergence');
+
 export const STEPS = [
   { id: 'prep', label: 'Préparation' },
-  { id: 'r1', label: 'Tour 1' },
-  { id: 'a1', label: 'Analyse' },
-  { id: 'r2', label: 'Tour 2' },
-  { id: 'a2', label: 'Analyse' },
-  { id: 'r3', label: 'Tour 3+' },
+  { id: 'r1', label: 'Tour 1 · Identification' },
+  { id: 'a1', label: 'Consolidation' },
+  { id: 'r2', label: 'Tour 2 · Analyse' },
+  { id: 'a2', label: 'Synthèse' },
+  { id: 'r3', label: 'Tour 3 · Convergence' },
   { id: 'a3', label: 'Consensus' },
   { id: 'eval', label: 'Évaluation' },
   { id: 'end', label: 'Résultat' },

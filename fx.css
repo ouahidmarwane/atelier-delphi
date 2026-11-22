@@ -358,3 +358,7 @@ body { background: var(--bg); }
 .fb-args { display: grid; gap: 0.45rem; font-size: 0.9rem; padding-top: 0.55rem; border-top: 1px dashed rgba(217, 72, 15, 0.35); }
 .fb-args p { display: grid; gap: 0.1rem; }
 .fb-args .arg-dir { font-size: 0.78rem; }
+
+/* Règle des étapes : chaque étape prend la place de son intitulé */
+.ruler li { flex: 1 1 auto; }
+@media (max-width: 1500px) { .topbar .brand .sub { display: none; } .ruler li { font-size: 0.76rem; padding-right: 0.3rem; } }

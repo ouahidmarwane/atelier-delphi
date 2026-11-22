@@ -1,9 +1,9 @@
 // Écran téléphone : l'étudiant rejoint, puis répond à chaque question du tour en cours.
-import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES } from './content.js?v=202611221401';
-import { fmt } from './analysis.js?v=202611221401';
-import { icon, esc, mmss } from './ui.js?v=202611221401';
-import { uid } from './store.js?v=202611221401';
-import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221401';
+import { SCENARIO, DEPARTMENTS, deptById, ROUND1_QUESTIONS, SCALES, RULES, roundName } from './content.js?v=202611221405';
+import { fmt } from './analysis.js?v=202611221405';
+import { icon, esc, mmss } from './ui.js?v=202611221405';
+import { uid } from './store.js?v=202611221405';
+import { ambient, ripples, spotlight, vibrate } from './fx.js?v=202611221405';
 
 const app = document.getElementById('app');
 let store;
@@ -194,7 +194,7 @@ function renderQuestion(q) {
   const label = q.kind === 'text' ? 'Question' : 'Risque';
   const head = `
     <div class="p-qhead">
-      <span class="eyebrow">Tour ${state.round} · ${label} ${state.qIndex + 1} sur ${q.total}</span>
+      <span class="eyebrow">Tour ${state.round} · ${roundName(state.round)} · ${label} ${state.qIndex + 1}/${q.total}</span>
       <span class="p-timer num" data-timer>${mmss(timeLeft() ?? 0)}</span>
     </div>
     <div class="p-progress"><span data-bar></span></div>`;

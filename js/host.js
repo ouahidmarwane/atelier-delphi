@@ -1,9 +1,9 @@
 // Écran projecteur : l'animateur pilote toute la séance d'ici.
-import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, decisionById, autoDecision, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221401';
-import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221401';
-import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221401';
-import { uid, aiGroup } from './store.js?v=202611221401';
-import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221401';
+import { SCENARIO, DEPARTMENTS, deptById, STEPS, ROUND1_QUESTIONS, SCALES, RULES, EVAL_CRITERIA, roundName, decisionById, autoDecision, priorityOf, THEMES, themeById, BOT_LINES, BOT_NAMES, BOT_MEASURES, BOT_ARGS } from './content.js?v=202611221405';
+import { matchThemes, analyzeOpen, candidateRisks, analyzeRatings, insightsRound1, insightsRatings, fmt, pct, topMeasures, normalize, splitLines } from './analysis.js?v=202611221405';
+import { icon, esc, qrSvg, deptDots, dial, updateDial, shuffle, pick } from './ui.js?v=202611221405';
+import { uid, aiGroup } from './store.js?v=202611221405';
+import { ambient, countUps, bump, confetti, linkHover, ripples, spotlight } from './fx.js?v=202611221405';
 
 const app = document.getElementById('app');
 let store;
@@ -558,7 +558,7 @@ function questionStage() {
   const q = qs[state.qIndex];
   if (!q) return '';
   const rating = q.kind === 'rating';
-  const label = state.round === 1 ? 'Identification' : state.round === 2 ? 'Notation' : 'Ajustement';
+  const label = roundName(state.round);
   const fb = rating && state.round >= 3 ? state.feedback?.[state.round]?.[q.key] : null;
   return `
   <section class="question enter" data-q="${state.round}-${state.qIndex}">
@@ -660,7 +660,7 @@ function results1Stage() {
   return `
   <section class="results enter">
     <header class="res-head">
-      <p class="eyebrow">Tour 1 · Résultats · Question ${idx + 1} sur ${ROUND1_QUESTIONS.length} ${aiBadge()}</p>
+      <p class="eyebrow">Tour 1 · Identification · Résultats · Question ${idx + 1} sur ${ROUND1_QUESTIONS.length} ${aiBadge()}</p>
       <h2>${esc(q.title)}</h2>
     </header>
     <div class="res-grid">
@@ -805,7 +805,7 @@ function ratingResultsStage() {
   return `
   <section class="results enter">
     <header class="res-head">
-      <p class="eyebrow">Tour ${r} · Résultats · Vue ${views.indexOf(view) + 1} sur ${views.length}</p>
+      <p class="eyebrow">Tour ${r} · ${roundName(r)} · Résultats · Vue ${views.indexOf(view) + 1} sur ${views.length}</p>
       <h2>${titles[view]}</h2>
     </header>
     ${body}
@@ -1017,7 +1017,7 @@ function controls() {
       right = b('toLobby', 'Afficher le QR code', 'primary', 'arrow-right');
       break;
     case 'lobby':
-      right = `${b('toScenario', 'Revoir le scénario', 'ghost')}${b('zoomQr', 'Agrandir le QR code', '', 'maximize')}${state.settings?.rehearsal ? b('addBots', 'Ajouter 20 participants fictifs', '', 'user-plus') : ''}${b('startRound1', 'Démarrer le tour 1', 'primary', 'arrow-right')}`;
+      right = `${b('toScenario', 'Revoir le scénario', 'ghost')}${b('zoomQr', 'Agrandir le QR code', '', 'maximize')}${state.settings?.rehearsal ? b('addBots', 'Ajouter 20 participants fictifs', '', 'user-plus') : ''}${b('startRound1', 'Démarrer le tour 1 · Identification', 'primary', 'arrow-right')}`;
       break;
     case 'question': {
       const qs = questionsFor(state.round);
@@ -1033,7 +1033,7 @@ function controls() {
       const count = state.round === 1 ? ROUND1_QUESTIONS.length : ratingViews().length;
       const nav = `<div class="pager">${b('prevView', '', 'icon', 'chevron-left')}<span class="num">${Math.min(state.resultIndex, count - 1) + 1} / ${count}</span>${b('nextView', '', 'icon', 'chevron-right')}</div>`;
       if (state.round === 1) right = nav + (ai?.status === 'pending' ? '' : b('rerunAi', 'Relancer l’IA', 'ghost', 'rotate')) + b('toConsolidate', 'Consolider la liste', 'primary', 'arrow-right');
-      else if (state.round === 2) right = nav + b('toEvaluate', 'Clore et évaluer', 'ghost') + b('nextRound', 'Lancer le tour 3', 'primary', 'arrow-right');
+      else if (state.round === 2) right = nav + b('toEvaluate', 'Clore et évaluer', 'ghost') + b('nextRound', 'Lancer le tour 3 · Convergence', 'primary', 'arrow-right');
       else {
         const open = ratingResults(state.round).filter((x) => x.n && !x.consensus).length;
         right = nav + (open
@@ -1044,7 +1044,7 @@ function controls() {
     }
     case 'consolidate': {
       const n = consolidation?.selected.size ?? 0;
-      right = `${b('backResults', 'Revoir les résultats', 'ghost')}<button class="btn primary" data-act="startRound2" ${n ? '' : 'disabled'}>Lancer le tour 2 avec ${n} risque${n > 1 ? 's' : ''}${icon('arrow-right')}</button>`;
+      right = `${b('backResults', 'Revoir les résultats', 'ghost')}<button class="btn primary" data-act="startRound2" ${n ? '' : 'disabled'}>Lancer le tour 2 · Analyse avec ${n} risque${n > 1 ? 's' : ''}${icon('arrow-right')}</button>`;
       break;
     }
     case 'evaluate':
